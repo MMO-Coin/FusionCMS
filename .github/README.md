@@ -114,9 +114,7 @@ contributions you make are **greatly appreciated**.
 
 The FusionCMS source is released under the [GNU AGPL v3](https://github.com/FusionWowCMS/FusionCMS/blob/main/LICENSE)
 
-## Sponsor this project
-> [!TIP]
-> [Donate with Cryptocurrency](https://paylink.payment4.com/en/Fusion%20CMS/007d3e04-643d-4105-b113-d37ad09e747e)
+MMOPro.org will continue rolling out new features and performance tweaks.
 
 ## Authors & Contributors
 
@@ -125,13 +123,3 @@ This project exists thanks to:
 - **[Jesper Lindström](https://github.com/jesperlindstrom)** (FusionCMS)
 - **[Xavier Geernick](https://github.com/XavierGeerinck)**
 - **[FusionGen](https://github.com/FusionGen/FusionGEN)**
-
-<a href="https://github.com/FusionWowCMS/FusionCMS/graphs/contributors">
-  <img src="https://contrib.rocks/image?repo=FusionWowCMS/FusionCMS" />
-</a>
-
-## Links
-
-<a href="https://discord.gg/tnWTkZ7akZ">
-    <img src="https://discord.com/api/guilds/1116706973828775976/widget.png?style=banner2" alt="Discord">
-</a>
