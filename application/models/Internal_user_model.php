@@ -115,10 +115,10 @@ class Internal_user_model extends CI_Model
     /**
      * Get the nickname
      *
-     * @param  Int $id
-     * @return String
+     * @param int|bool $id
+     * @return string|null
      */
-    public function getNickname($id = false)
+    public function getNickname(int|bool $id = false): ?string
     {
         if (!$id) {
             return $this->nickname;
@@ -126,35 +126,32 @@ class Internal_user_model extends CI_Model
             $query = $this->db->table('account_data')->select('nickname')->where(array('id' => $id))->get();
 
             if ($query->getNumRows() > 0) {
-                $result = $query->getResultArray();
-            } else {
-                $result[0]['nickname'] = "";
+                $result = $query->getRowArray();
+
+                if (isset($result['nickname']) && strlen($result['nickname']) > 0) {
+                    return $result['nickname'];
+                }
             }
 
-            if (strlen($result[0]['nickname']) > 0) {
-                return $result[0]['nickname'];
-            } else {
-                return $this->external_account_model->getUsername($id);
-            }
+            return $this->external_account_model->getUsername($id);
         }
     }
 
     /**
      * Gets the value of the specified table, column where value = value
      *
-     * @param  String $table
-     * @param  String $column
-     * @param  String $value
-     * @return String, bool
+     * @param  string $table
+     * @param  string $column
+     * @param  string $value
+     * @return string|array|bool
      */
     public function getValue($table, $column, $value, $columns = "*")
     {
         //Continue with selecting data.
         $query = $this->db->table($table)->select($columns)->where(array($column => $value))->get();
-        $result = $query->getResultArray();
 
         if ($query->getNumRows() > 0) {
-            return $result[0];
+            return $query->getRowArray();
         } else {
             return "";
         }
@@ -164,8 +161,8 @@ class Internal_user_model extends CI_Model
     {
         $query = $this->db->query("SELECT access_id FROM ranks WHERE id = ?", [$rankId]);
         if ($query->getNumRows() > 0) {
-            $result = $query->getResultArray();
-            return $result[0]['access_id'];
+            $result = $query->getRowArray();
+            return $result['access_id'];
         } else {
             return false;
         }
@@ -176,9 +173,9 @@ class Internal_user_model extends CI_Model
         $query = $this->db->query("SELECT id FROM account_data WHERE nickname = ?", [$nickname]);
 
         if ($query->getNumRows() > 0) {
-            $result = $query->getResultArray();
+            $result = $query->getRowArray();
 
-            return $result[0]['id'];
+            return $result['id'];
         } else {
             return false;
         }
@@ -216,9 +213,9 @@ class Internal_user_model extends CI_Model
         $query = $this->db->query("SELECT avatar FROM avatars WHERE id = ?", [$avatarId]);
 
         if ($query->getNumRows() > 0) {
-            $result = $query->getResultArray();
+            $result = $query->getRowArray();
 
-            return $result[0]['avatar'];
+            return $result['avatar'];
         }
 
         return false;
@@ -232,11 +229,12 @@ class Internal_user_model extends CI_Model
             $query = $this->db->query("SELECT avatar FROM account_data WHERE id = ?", [$id]);
 
             if ($query->getNumRows() > 0) {
-                $result = $query->getResultArray();
+                $result = $query->getRowArray();
 
-                return $result[0]['avatar'];
+                return $result['avatar'];
             }
         }
+        return false;
     }
 
     /*

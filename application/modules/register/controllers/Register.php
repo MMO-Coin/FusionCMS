@@ -6,6 +6,7 @@ use MX\MX_Controller;
 /**
  * Register Controller Class
  * @property activation_model $activation_model activation_model Class
+ * @author   MMO-Coin <https://github.com/MMO-Coin/FusionCMS>
  */
 class Register extends MX_Controller
 {
@@ -64,13 +65,13 @@ class Register extends MX_Controller
 
         Events::trigger('onRegisterPageOpened');
 
-        if (count($_POST)) {
+        if ($this->input->post()) {
             $emailAvailable = $this->email_check($this->input->post('register_email'));
             $usernameAvailable = $this->username_check($this->input->post('register_username'));
 
             if ($use_captcha) {
                 if ($captcha_type == 'recaptcha' || $captcha_type == 'recaptcha3') {
-                    if($this->recaptcha->getEnabledRecaptcha()) {
+                    if ($this->recaptcha->getEnabledRecaptcha()) {
                         $recaptcha = $this->input->post('g-recaptcha-response');
                         if ($captcha_type == 'recaptcha') {
                             $captcha = $this->recaptcha->verifyResponse($recaptcha)['success'];
@@ -78,8 +79,7 @@ class Register extends MX_Controller
                             $score = $this->recaptcha->verifyScore($recaptcha);
                             $captcha = $score > 0.5;
                         }
-                    }
-                    else
+                    } else
                         $recaptcha = 'disabled';
                 } else if ($captcha_type == 'inbuilt') {
                     $captcha = strtoupper($this->input->post('register_captcha')) == strtoupper($captchaObj->getValue());
@@ -95,7 +95,7 @@ class Register extends MX_Controller
         }
 
         //Check if everything went correct
-        if (!$this->form_validation->run() || !$captcha || !count($_POST) || !$usernameAvailable || !$emailAvailable) {
+        if (!$this->form_validation->run() || !$captcha || !$this->input->post() || !$usernameAvailable || !$emailAvailable) {
             $fields = array('username', 'email', 'password', 'password_confirm');
 
             $data = [
@@ -110,7 +110,7 @@ class Register extends MX_Controller
                 "url" => $this->template->page_url
             ];
 
-            if (count($_POST) > 0) {
+            if ($this->input->post()) {
                 // Loop through fields and assign error or success image
                 foreach ($fields as $field) {
                     if (strlen(form_error('register_' . $field)) == 0 && empty($data[$field . "_error"])) {
@@ -121,7 +121,7 @@ class Register extends MX_Controller
                 }
 
                 if ($captcha_type == 'recaptcha' || $captcha_type == 'recaptcha3') {
-                    if(!$captcha && !$recaptcha == 'disabled') {
+                    if (!$captcha && !$recaptcha == 'disabled') {
                         $data['captcha_error'] = true;
                     }
                 } else if ($captcha_type == 'inbuilt') {
@@ -156,16 +156,13 @@ class Register extends MX_Controller
                 "email_activation" => $this->config->item('enable_email_activation')
             ];
 
-            if($this->config->item('enable_email_activation'))
-            {
+            if ($this->config->item('enable_email_activation')) {
                 $key = $this->activation_model->add($username, $password, $email);
 
-                $link = base_url().'register/activate/'.$key;
+                $link = base_url() . 'register/activate/' . $key;
 
-                sendMail($email, $this->config->item('server_name').': ' . lang('activate_account', 'register'), $username, lang('created_account_activate', 'register') . ' <a href="' . $link . '">' . $link . '</a>', 1);
-            }
-            else
-            {
+                sendMail($email, $this->config->item('server_name') . ': ' . lang('activate_account', 'register'), $username, lang('created_account_activate', 'register') . ' <a href="' . $link . '">' . $link . '</a>', 1);
+            } else {
                 //Register our user.
                 $this->external_account_model->createAccount($username, $password, $email);
 
@@ -214,16 +211,14 @@ class Register extends MX_Controller
 
     public function activate($key = false)
     {
-        if(!$key)
-        {
+        if (!$key) {
             $this->template->box(lang("invalid_key", "register"), lang("invalid_key_long", "register"), true);
             return;
         }
 
         $account = $this->activation_model->getAccount($key);
 
-        if(!$account)
-        {
+        if (!$account) {
             $this->template->box(lang("invalid_key", "register"), lang("invalid_key_long", "register"), true);
             return;
         }

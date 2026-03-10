@@ -23,6 +23,7 @@ use PayPal\Exception\PayPalConnectionException;
 /**
  * Donate Controller Class
  * @property donate_model $donate_model donate_model Class
+ * @author   MMO-Coin <https://github.com/MMO-Coin/FusionCMS>
  */
 class Donate extends MX_Controller
 {
@@ -47,10 +48,8 @@ class Donate extends MX_Controller
 
         $paypal = ["values" => $this->paypal_model->getDonations()];
 
-        if ($this->input->post())
-        {
-            if ($this->input->post("donation_type") == "paypal")
-            {
+        if ($this->input->post()) {
+            if ($this->input->post("donation_type") == "paypal") {
                 $this->getDonate($this->input->post("data_id"));
             }
         }
@@ -62,25 +61,22 @@ class Donate extends MX_Controller
         $donateGateways = [];
 
         // Donate gateways: Find
-        foreach(glob($modulesPath . DIRECTORY_SEPARATOR . 'donate_*', GLOB_ONLYDIR) as $key => $module)
-        {
+        foreach (glob($modulesPath . DIRECTORY_SEPARATOR . 'donate_*', GLOB_ONLYDIR) as $key => $module) {
             // Donate gateways: Append
             $donateGateways[$key] = [
-                'url'  => base_url() . basename($module),
+                'url' => base_url() . basename($module),
                 'name' => ucfirst(strtolower(str_replace('donate_', '', basename($module)))),
-                'icon' => base_url() . strtolower(basename(APPPATH)) . '/' . strtolower(basename($modulesPath)) . '/' . strtolower($this->router->fetch_module()) . '/images/unknown.png'
+                'icon' => base_url() . strtolower(basename(APPPATH)) . '/' . strtolower(basename($modulesPath)) . '/' . strtolower($this->router->module ?? '') . '/images/unknown.png'
             ];
 
             // Module: Loop through tree | Find icon
-            foreach(new RecursiveIteratorIterator(new RecursiveDirectoryIterator($module, FilesystemIterator::SKIP_DOTS)) as $file)
-            {
+            foreach (new RecursiveIteratorIterator(new RecursiveDirectoryIterator($module, FilesystemIterator::SKIP_DOTS)) as $file) {
                 // SKIP.. invalid file
-                if(!$file->isFile())
+                if (!$file->isFile())
                     continue;
 
                 // Icon: Found
-                if(in_array(strtolower($file->getExtension()), ['jpg', 'jpeg', 'png']) && strpos(strtolower($file->getFilename()), strtolower($donateGateways[$key]['name'] . '.')) !== false)
-                {
+                if (in_array(strtolower($file->getExtension()), ['jpg', 'jpeg', 'png']) && strpos(strtolower($file->getFilename()), strtolower($donateGateways[$key]['name'] . '.')) !== false) {
                     // Donate gateways: Fill (icon)
                     $donateGateways[$key]['icon'] = base_url() . str_replace(FCPATH, '', $file->getPathname());
 
@@ -107,8 +103,8 @@ class Donate extends MX_Controller
         $pageData = [
             "module" => "default",
             "headline" => breadcrumb([
-                            "ucp" => lang("ucp"),
-                            "donate" => lang("donate_panel", "donate")
+                "ucp" => lang("ucp"),
+                "donate" => lang("donate_panel", "donate")
             ]),
             "content" => $output
         ];
@@ -141,8 +137,8 @@ class Donate extends MX_Controller
     {
         $execute = new PaymentExecution();
 
-        $payment_id = $_GET['paymentId'] ?? '';
-        $payerId = $_GET['PayerID'] ?? '';
+        $payment_id = $this->input->get('paymentId') ?? '';
+        $payerId = $this->input->get('PayerID') ?? '';
         $payment = Payment::get($payment_id, $this->getApi());
 
         $execute->setPayerId($payerId);
@@ -174,7 +170,7 @@ class Donate extends MX_Controller
 
                 Events::trigger('onSuccessDonate', $this->user->getId(), $specify_donate);
 
-                $this->dblogger->createLog("user", "donate", $specify_donate['price'].$this->config->item('donation_currency_sign'), $specify_donate['points'], Dblogger::STATUS_SUCCEED, $this->user->getId());
+                $this->dblogger->createLog("user", "donate", $specify_donate['price'] . $this->config->item('donation_currency_sign'), $specify_donate['points'], Dblogger::STATUS_SUCCEED, $this->user->getId());
 
                 redirect(base_url('/donate/success'));
             }
@@ -227,7 +223,7 @@ class Donate extends MX_Controller
 
         $setTax = $this->config->item('paypal_tax');
         $setPrice = $this->paypal_model->getSpecifyDonate($id)['price'];
-        $setTotal = ((float)$setTax + $setPrice);
+        $setTotal = ((float) $setTax + $setPrice);
 
         //Payer
         $payer->setPaymentMethod('paypal');

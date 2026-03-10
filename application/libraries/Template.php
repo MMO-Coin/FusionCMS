@@ -1,7 +1,6 @@
 <?php
 
-if (!defined('BASEPATH'))
-{
+if (!defined('BASEPATH')) {
     exit('No direct script access allowed');
 }
 
@@ -14,9 +13,23 @@ use MX\CI;
  * @author  Elliott Robbins
  * @author  Keramat Jokar (Nightprince) <https://github.com/Nightprince>
  * @author  Ehsan Zare (Darksider) <darksider.legend@gmail.com>
+ * @author  MMO-Coin <https://github.com/MMO-Coin/FusionCMS>
  * @link    https://github.com/FusionWowCMS/FusionCMS
  */
 
+/**
+ * @property-read \Smartyengine $smarty
+ * @property-read \User $user
+ * @property-read \MX\MX_Router $router
+ * @property-read \Cms_model $cms_model
+ * @property-read \CI_Input $input
+ * @property-read \CI_Config $config
+ * @property-read \Language $language
+ * @property-read \CI_Output $output
+ * @property-read \External_account_model $external_account_model
+ * @property-read \CI_Cache $cache
+ * @method void view(string $template, string $css = null, string $js = null)
+ */
 class Template
 {
     private $CI;
@@ -45,28 +58,32 @@ class Template
         $this->CI =& get_instance();
 
         // Get the theme name
-        $this->theme = $this->CI->config->item('theme');
+        $this->theme = $this->config->item('theme');
 
         // Construct the paths
-        $this->module_name = $this->CI->router->fetch_module();
-        $this->theme_path  = "themes/" . $this->theme . "/";
-        $this->view_path   = "views/";
-        $this->style_path  = base_url() . basename(APPPATH) . '/' . "themes/" . $this->theme . "/css/";
-        $this->image_path  = base_url() . basename(APPPATH) . '/' . "themes/" . $this->theme . "/images/";
-        $this->full_theme_path  = base_url() . basename(APPPATH) . '/' . $this->theme_path;
-        $this->writable_path  = base_url() .'writable/';
-        $this->page_url    = ($this->CI->config->item('rewrite')) ? base_url() : base_url() . 'index.php/';
+        $this->module_name = $this->router->module ?? '';
+        $this->theme_path = "themes/" . $this->theme . "/";
+        $this->view_path = "views/";
+        $this->style_path = base_url() . basename(APPPATH) . '/' . "themes/" . $this->theme . "/css/";
+        $this->image_path = base_url() . basename(APPPATH) . '/' . "themes/" . $this->theme . "/images/";
+        $this->full_theme_path = base_url() . basename(APPPATH) . '/' . $this->theme_path;
+        $this->writable_path = base_url() . 'writable/';
+        $this->page_url = ($this->config->item('rewrite')) ? base_url() : base_url() . 'index.php/';
         $this->loadManifest();
         $this->loadModuleManifest();
-        $this->title       = "";
+        $this->title = "";
         $this->custom_page = false;
         $this->custom_keywords = false;
         $this->custom_description = false;
 
-        if (!defined("pageURL"))
-        {
+        if (!defined("pageURL")) {
             define("pageURL", $this->page_url);
         }
+    }
+
+    public function __get($variable)
+    {
+        return $this->CI->$variable;
     }
 
     /**
@@ -74,12 +91,9 @@ class Template
      */
     private function loadManifest(): void
     {
-        if (!file_exists(APPPATH . $this->theme_path))
-        {
+        if (!file_exists(APPPATH . $this->theme_path)) {
             show_error("Invalid theme. The folder <b>" . APPPATH . $this->theme_path . "</b> doesn't exist!");
-        }
-        elseif (!file_exists(APPPATH . $this->theme_path . "/manifest.json"))
-        {
+        } elseif (!file_exists(APPPATH . $this->theme_path . "/manifest.json")) {
             show_error("Invalid theme. The file <b>manifest.json</b> is missing!");
         }
 
@@ -92,8 +106,7 @@ class Template
         // Fix the favicon link
         $array['favicon'] = $this->image_path . $array['favicon'];
 
-        if (!isset($array['blank_header']))
-        {
+        if (!isset($array['blank_header'])) {
             $array['blank_header'] = '';
         }
 
@@ -101,8 +114,7 @@ class Template
         $this->theme_data = $array;
 
         // Check if the theme has any configs
-        if($this->hasConfigs($this->theme))
-        {
+        if ($this->hasConfigs($this->theme)) {
             // Load the theme configs
             $this->loadConfigs();
 
@@ -153,8 +165,8 @@ class Template
     /**
      * Get the config name out of the path
      *
-     * @param String $path
-     * @return String
+     * @param string $path
+     * @return string
      */
     private function getConfigName(string $path = ""): string
     {
@@ -166,12 +178,9 @@ class Template
      */
     private function loadModuleManifest(): void
     {
-        if (!file_exists(APPPATH . "modules/" . strtolower($this->getModuleName())))
-        {
+        if (!file_exists(APPPATH . "modules/" . strtolower($this->getModuleName()))) {
             show_error("Invalid Module. The folder <b>" . APPPATH . "modules/" . strtolower($this->getModuleName()) . "</b> doesn't exist!");
-        }
-        elseif (!file_exists(APPPATH . $this->theme_path . "/manifest.json"))
-        {
+        } elseif (!file_exists(APPPATH . $this->theme_path . "/manifest.json")) {
             show_error("The manifest.json file for <b>" . strtolower($this->getModuleName()) . "</b> does not exist");
         }
 
@@ -181,8 +190,7 @@ class Template
         // Convert to array
         $array = json_decode($data, true);
 
-        if (!is_array($array))
-        {
+        if (!is_array($array)) {
             show_error("The manifest.json file for <b>" . strtolower($this->getModuleName()) . "</b> is not properly formatted");
         }
 
@@ -198,17 +206,14 @@ class Template
     private function isSliderShown(): bool
     {
         // Is it enabled?
-        if ($this->CI->config->item('slider'))
-        {
+        if ($this->config->item('slider')) {
             // Only on news page?, if yes, make sure we are on the news page, then show it
-            if ($this->CI->config->item('slider_home') && $this->CI->router->class == "news")
-            {
+            if ($this->config->item('slider_home') && $this->router->class == "news") {
                 return true;
             }
 
             // If we want to only show it on the home page, then do not show it on the other pages.
-            elseif ($this->CI->config->item('slider_home') && $this->CI->router->class != "news")
-            {
+            elseif ($this->config->item('slider_home') && $this->router->class != "news") {
                 return false;
             }
 
@@ -221,33 +226,27 @@ class Template
     /**
      * Loads the template
      *
-     * @param String $content The page content
-     * @param bool|String $css Full path to your css file
-     * @param bool|String $js Full path to your js file
+     * @param string $content The page content
+     * @param bool|string $css Full path to your css file
+     * @param bool|string $js Full path to your js file
      */
     public function view(string $content, bool|string|array $css = false, bool|string|array $js = false)
     {
-        if ($this->CI->config->item("message_enabled") && $this->CI->router->fetch_class() != "auth" && !$this->CI->user->isStaff())
-        {
+        if ($this->config->item("message_enabled") && ($this->router->class ?? '') != "auth" && !hasPermission("view", "gm")) {
             $output = $this->handleAnnouncement();
-        }
-        elseif ($this->CI->input->is_ajax_request() && isset($_GET['is_json_ajax']) && $_GET['is_json_ajax'] == 1)
-        {
+        } elseif ($this->input->is_ajax_request() && $this->input->get('is_json_ajax') == 1) {
             $output = $this->handleAjaxRequest($content, $css, $js);
-        }
-        else
-        {
+        } else {
             $output = $this->handleNormalPage($content, $css, $js);
         }
 
-        $dirModule = strtolower(CI::$APP->router->fetch_module() .'/'. CI::$APP->router->fetch_method());
+        $dirModule = strtolower(($this->router->module ?? '') . '/' . ($this->router->method ?? ''));
 
-        if ($this->CI->external_account_model->getTotpSecret() !== null && ($this->CI->user->getTotpSecret() != $this->CI->external_account_model->getTotpSecret()) && $dirModule != 'auth/security')
-        {
+        if ($this->external_account_model->getTotpSecret() !== null && ($this->user->getTotpSecret() != $this->external_account_model->getTotpSecret()) && $dirModule != 'auth/security') {
             redirect($this->CI->template->page_url . "auth/security");
         }
 
-        return $this->CI->output->set_output($output);
+        return $this->output->set_output($output);
     }
 
     /**
@@ -258,21 +257,20 @@ class Template
      * @param bool|string|array $js
      * @return mixed
      */
-    private function handleNormalPage($content, bool|string|array$css, bool|string|array$js): mixed
+    private function handleNormalPage($content, bool|string|array $css, bool|string|array $js): mixed
     {
         //Load the sideboxes
         $sideboxes = $this->loadSideboxes();
-        $sideboxes_side   = $sideboxes['side'] ?? [];
-        $sideboxes_top    = $sideboxes['top'] ?? [];
+        $sideboxes_side = $sideboxes['side'] ?? [];
+        $sideboxes_top = $sideboxes['top'] ?? [];
         $sideboxes_bottom = $sideboxes['bottom'] ?? [];
-        $header           = $this->getHeader($css, $js);
-        $modals           = $this->getModals();
+        $header = $this->getHeader($css, $js);
+        $modals = $this->getModals();
 
-        $url = $this->CI->router->fetch_class();
+        $url = $this->router->class ?? '';
 
-        if ($this->CI->router->fetch_method() != "index")
-        {
-            $url .= "/" . $this->CI->router->fetch_method();
+        if (($this->router->method ?? '') != "index") {
+            $url .= "/" . ($this->router->method ?? '');
         }
 
         // Gather the theme data
@@ -282,7 +280,7 @@ class Template
             "theme_path" => "application/" . $this->theme_path,
             "writable_path" => $this->writable_path,
             "full_theme_path" => $this->page_url . "application/" . $this->theme_path,
-            "serverName" => $this->CI->config->item('server_name'),
+            "serverName" => $this->config->item('server_name'),
             "page" => '<div id="content_ajax">' . $content . '</div>',
             "slider" => $this->getSlider(),
             "show_slider" => $this->isSliderShown(),
@@ -290,15 +288,15 @@ class Template
             "modals" => $modals,
             "CI" => $this->CI,
             "image_path" => $this->image_path,
-            "isOnline" => $this->CI->user->isOnline(),
-            "isRTL" => $this->CI->language->getLanguage() == 'persian' || $this->CI->language->getClientData() == 'persian',
+            "isOnline" => $this->user->isOnline(),
+            "isRTL" => $this->language->getLanguage() == 'persian' || $this->language->getClientData() == 'persian',
             "sideboxes" => $sideboxes_side,
             "sideboxes_top" => $sideboxes_top,
             "sideboxes_bottom" => $sideboxes_bottom
         ];
 
         // Load the main template
-        return $this->CI->smarty->view($this->theme_path . "template.tpl", $theme_data, true);
+        return $this->smarty->view($this->theme_path . "template.tpl", $theme_data, true);
     }
 
     /**
@@ -312,13 +310,13 @@ class Template
     private function handleAjaxRequest(string $content = "", bool|string|array $css = "", bool|string|array $js = ""): string
     {
         $array = [
-            "title" => $this->title . $this->CI->config->item('title'),
+            "title" => $this->title . $this->config->item('title'),
             "content" => $content,
             "js" => $js,
             "css" => $css,
             "slider" => $this->isSliderShown(),
-            "serverName" => $this->CI->config->item('server_name'),
-            "language" => $this->CI->language->getClientData()
+            "serverName" => $this->config->item('server_name'),
+            "language" => $this->language->getClientData()
         ];
 
         return json_encode($array);
@@ -331,10 +329,10 @@ class Template
     {
         $data = array(
             'module' => 'default',
-            'title' => $this->CI->config->item("title"),
-            'headline' => $this->CI->config->item("message_headline"),
-            'message' => $this->CI->config->item("message_text"),
-            'size' => $this->CI->config->item('message_headline_size')
+            'title' => $this->config->item("title"),
+            'headline' => $this->config->item("message_headline"),
+            'message' => $this->config->item("message_text"),
+            'size' => $this->config->item('message_headline_size')
         );
 
         return $this->loadPage("message.tpl", $data);
@@ -349,12 +347,12 @@ class Template
     {
         $modal_data = array(
             'url' => $this->page_url,
-            'vote_reminder' => $this->CI->config->item('vote_reminder'),
-            'vote_reminder_image' => $this->CI->config->item('vote_reminder_image')
+            'vote_reminder' => $this->config->item('vote_reminder'),
+            'vote_reminder_image' => $this->config->item('vote_reminder_image')
         );
 
         // Load the modals
-        return $this->CI->smarty->view($this->theme_path . "views/modals.tpl", $modal_data, true);
+        return $this->smarty->view($this->theme_path . "views/modals.tpl", $modal_data, true);
     }
 
     /**
@@ -380,54 +378,51 @@ class Template
             "image_path" => $this->image_path,
             "writable_path" => $this->writable_path,
             "url" => $this->page_url,
-            "title" => $this->title . $this->CI->config->item('title'),
-            "serverName" => $this->CI->config->item('server_name'),
-            "slider_interval" => $this->CI->config->item('slider_interval'),
-            "slider_style" => $this->CI->config->item('slider_style'),
+            "title" => $this->title . $this->config->item('title'),
+            "serverName" => $this->config->item('server_name'),
+            "slider_interval" => $this->config->item('slider_interval'),
+            "slider_style" => $this->config->item('slider_style'),
             "vote_reminder" => $this->voteReminder(),
-            "keywords" => ($this->custom_keywords) ?? $this->CI->config->item("keywords"),
-            "description" => ($this->custom_description) ?? $this->CI->config->item("description"),
-            "menu_top"    => $menus['top'] ?? [],
-            "menu_side"   => $menus['side'] ?? [],
+            "keywords" => ($this->custom_keywords) ?? $this->config->item("keywords"),
+            "description" => ($this->custom_description) ?? $this->config->item("description"),
+            "menu_top" => $menus['top'] ?? [],
+            "menu_side" => $menus['side'] ?? [],
             "menu_bottom" => $menus['bottom'] ?? [],
             "path" => base_url() . basename(APPPATH) . '/',
             "favicon" => $this->theme_data['favicon'],
-            "minify_js" => !$this->CI->config->item('enable_minify_js'),
-            "minify_css" => !$this->CI->config->item('enable_minify_css'),
+            "minify_js" => !$this->config->item('enable_minify_js'),
+            "minify_css" => !$this->config->item('enable_minify_css'),
             "extra_css" => $css,
             "extra_js" => $js,
-            "analytics" => $this->CI->config->item('analytics'),
+            "analytics" => $this->config->item('analytics'),
             "use_fcms_tooltip" => true,
             "slider" => $this->theme_data['slider_text'],
             "slider_id" => $this->theme_data['slider_id'],
-            "csrf_cookie" => $this->CI->input->cookie('csrf_token_name'),
-            "client_language" => $this->CI->language->getClientData(),
-            "activeLanguage" => $this->CI->language->getLanguage(),
-            "cdn_link" => $this->CI->config->item('cdn') === true ? $this->CI->config->item('cdn_link') : null,
-            "isOnline" => $this->CI->user->isOnline(),
-            "isRTL" => $this->CI->language->getLanguage() == 'persian' || $this->CI->language->getClientData() == 'persian',
+            "csrf_cookie" => $this->input->cookie('csrf_token_name'),
+            "client_language" => $this->language->getClientData(),
+            "activeLanguage" => $this->language->getLanguage(),
+            "cdn_link" => $this->config->item('cdn') === true ? $this->config->item('cdn_link') : null,
+            "isOnline" => $this->user->isOnline(),
+            "isRTL" => $this->language->getLanguage() == 'persian' || $this->language->getClientData() == 'persian',
             "social_media" => [
-                'facebook' => $this->CI->config->item('facebook'),
-                'twitter' => $this->CI->config->item('twitter'),
-                'youtube' => $this->CI->config->item('youtube'),
-                'discord' => $this->CI->config->item('discord'),
-                'instagram' => $this->CI->config->item('instagram')
+                'facebook' => $this->config->item('facebook'),
+                'twitter' => $this->config->item('twitter'),
+                'youtube' => $this->config->item('youtube'),
+                'discord' => $this->config->item('discord'),
+                'instagram' => $this->config->item('instagram')
             ],
             "use_captcha" => false,
-            "captcha_type" => $this->CI->config->item('captcha_type')
+            "captcha_type" => $this->config->item('captcha_type')
         ];
 
         $headerView = "application/" . $this->theme_path . "views/header.tpl";
 
         // Check if this theme wants to replace our view with its own
-        if (file_exists($headerView))
-        {
-            return $this->CI->smarty->view($headerView, $header_data, true);
-        }
-        else
-        {
+        if (file_exists($headerView)) {
+            return $this->smarty->view($headerView, $header_data, true);
+        } else {
             // Load the theme
-            return $this->CI->smarty->view($this->view_path . "header.tpl", $header_data, true);
+            return $this->smarty->view($this->view_path . "header.tpl", $header_data, true);
         }
     }
 
@@ -438,13 +433,12 @@ class Template
      */
     private function voteReminder(): bool|string
     {
-        if ($this->CI->config->item('vote_reminder') && !$this->CI->input->cookie("vote_reminder"))
-        {
-            $this->CI->input->set_cookie("vote_reminder", "1", $this->CI->config->item('reminder_interval'));
-            
+        if ($this->config->item('vote_reminder') && !$this->input->cookie("vote_reminder")) {
+            $this->input->set_cookie("vote_reminder", "1", $this->config->item('reminder_interval'));
+
             return true;
         }
-        
+
         return false;
     }
 
@@ -461,9 +455,9 @@ class Template
             'bottom' => [],
         ];
 
-        $module = CI::$APP->router->fetch_module();
+        $module = CI::$APP->router->module ?? '';
 
-        $allSideboxes = $this->CI->cms_model->getSideboxes($module);
+        $allSideboxes = $this->cms_model->getSideboxes($module);
 
         foreach ((array) $allSideboxes as $sideBox) {
             $location = $sideBox['location'] ?? 'side';
@@ -488,10 +482,10 @@ class Template
             $object = ($sideboxType === 'custom') ? new $sideboxType($sideBox['id']) : new $sideboxType();
 
             $output[$location][] = [
-                'name'     => langColumn($sideBox['displayName']),
+                'name' => langColumn($sideBox['displayName']),
                 'location' => $location,
-                'data'     => $object->view(),
-                'type'     => $sideboxType,
+                'data' => $object->view(),
+                'type' => $sideboxType,
             ];
         }
 
@@ -501,9 +495,9 @@ class Template
     /**
      * Load a page template
      *
-     * @param String $page Filename
-     * @param Array $data Array of additional template data
-     * @return String
+     * @param string $page Filename
+     * @param array $data Array of additional template data
+     * @return string
      */
     public function loadPage(string $page, array $data = []): string
     {
@@ -511,21 +505,20 @@ class Template
         $data['module'] = array_key_exists("module", $data) ? $data['module'] : $this->module_name;
 
         // Get the rest of the data
-        $data['url']             = array_key_exists("url", $data) ? $data['url'] : $this->page_url;
-        $data['theme_path']      = array_key_exists("theme_path", $data) ? $data['theme_path'] : $this->theme_path;
-        $data['image_path']      = array_key_exists("image_path", $data) ? $data['image_path'] : $this->image_path;
+        $data['url'] = array_key_exists("url", $data) ? $data['url'] : $this->page_url;
+        $data['theme_path'] = array_key_exists("theme_path", $data) ? $data['theme_path'] : $this->theme_path;
+        $data['image_path'] = array_key_exists("image_path", $data) ? $data['image_path'] : $this->image_path;
         $data['full_theme_path'] = array_key_exists("full_theme_path", $data) ? $data['full_theme_path'] : $this->full_theme_path;
-        $data['writable_path']   = array_key_exists("writable_path", $data) ? $data['writable_path'] : $this->writable_path;
-        $data['CI']              = array_key_exists("CI", $data) ? $data['CI'] : $this->CI;
-        $data['ucp_menus']       = array_key_exists("ucp_menus", $data) ? $data['ucp_menus'] : $this->getUcpMenu();
+        $data['writable_path'] = array_key_exists("writable_path", $data) ? $data['writable_path'] : $this->writable_path;
+        $data['CI'] = array_key_exists("CI", $data) ? $data['CI'] : $this->CI;
+        $data['ucp_menus'] = array_key_exists("ucp_menus", $data) ? $data['ucp_menus'] : $this->getUcpMenu();
 
         // Should we load from the default views or not?
-        if ($data['module'] == "default")
-        {
+        if ($data['module'] == "default") {
             // Shorthand for loading views/page.tpl
             $page = ($page == "page.tpl") ? "views/page.tpl" : $page;
-            
-            return $this->CI->smarty->view($this->theme_path . $page, $data, true, true);
+
+            return $this->smarty->view($this->theme_path . $page, $data, true);
         }
 
         $isOldTheme = empty($this->theme_data['min_required_version']);
@@ -535,29 +528,26 @@ class Template
 
         // Construct the path
         $themeView = 'application/' . $this->theme_path . 'modules/' . $data['module'] . '/' . $page;
-        
+
         // Check if this theme wants to replace our view with its own
-        if (file_exists($themeView))
-        {
-            return $this->CI->smarty->view($themeView, $data, true);
-        }
-        else if ($isOldTheme && file_exists($oldThemeView))
-        {
-            return $this->CI->smarty->view($oldThemeView, $data, true);
+        if (file_exists($themeView)) {
+            return $this->smarty->view($themeView, $data, true);
+        } else if ($isOldTheme && file_exists($oldThemeView)) {
+            return $this->smarty->view($oldThemeView, $data, true);
         }
 
-        return $this->CI->smarty->view('modules/' . $data['module'] . '/views/' . $page, $data, true);
+        return $this->smarty->view('modules/' . $data['module'] . '/views/' . $page, $data, true);
     }
 
     /**
      * Shorthand for loading a content box
      *
-     * @param String $title
-     * @param String $body
-     * @param Boolean $full
+     * @param string $title
+     * @param string $body
+     * @param bool $full
      * @param bool|string $css
      * @param bool|string $js
-     * @return String
+     * @return string
      */
     public function box(string $title, string $body, bool $full = false, bool|string $css = false, bool|string $js = false): string
     {
@@ -565,13 +555,12 @@ class Template
             "module" => "default",
             "headline" => $title,
             "content" => $body,
-            "serverName" => $this->CI->config->item('server_name')
+            "serverName" => $this->config->item('server_name')
         );
 
         $page = $this->loadPage("page.tpl", $data);
-        
-        if ($full)
-        {
+
+        if ($full) {
             $this->view($page, $css, $js);
         }
 
@@ -592,38 +581,31 @@ class Template
         ];
 
         // Get the database values
-        $links = $this->CI->cms_model->getLinks();
+        $links = $this->cms_model->getLinks();
         $moduleName = $this->getModuleName();
 
-        foreach ($links as $item)
-        {
+        foreach ($links as $item) {
             $side = $item['type'] ?? 'side';
 
             if ($item['permission'] && !hasViewPermission($item['permission'], "--MENU--"))
                 continue;
 
             // Xss protect out names
-            $item['name']   = $this->format(langColumn($item['name']), false, false);
+            $item['name'] = $this->format(langColumn($item['name']), false, false);
             $item['active'] = false;
 
             // Hard coded PM count
-            if ($item['link'] == "messages")
-            {
-                $count = $this->CI->cms_model->getMessagesCount();
-                if ($count > 0)
-                {
+            if ($item['link'] == "messages") {
+                $count = $this->cms_model->getMessagesCount();
+                if ($count > 0) {
                     $item['name'] .= " <b>(" . $count . ")</b>";
                 }
             }
 
-            if (!preg_match("/^\/|[a-z][a-z0-9+\-.]*:/i", $item['link']))
-            {
-                if ($moduleName == $item['link'])
-                {
+            if (!preg_match("/^\/|[a-z][a-z0-9+\-.]*:/i", $item['link'])) {
+                if ($moduleName == $item['link']) {
                     $item['active'] = true;
-                }
-                elseif ($moduleName == "page" && ($moduleName . "/" . $this->custom_page == $item['link']))
-                {
+                } elseif ($moduleName == "page" && ($moduleName . "/" . $this->custom_page == $item['link'])) {
                     $item['active'] = true;
                 }
 
@@ -645,16 +627,14 @@ class Template
     public function getSlider()
     {
         // Load the slides from the database
-        $slides_arr = $this->CI->cms_model->getSlides();
+        $slides_arr = $this->cms_model->getSlides();
 
-        if ($slides_arr)
-        {
-            foreach ($slides_arr as $key => $image)
-            {
+        if ($slides_arr) {
+            foreach ($slides_arr as $key => $image) {
                 $slides_arr[$key]['header'] = langColumn($image['header']);
-                $slides_arr[$key]['body']   = langColumn($image['body']);
+                $slides_arr[$key]['body'] = langColumn($image['body']);
                 $slides_arr[$key]['footer'] = langColumn($image['footer']);
-                
+
                 // Replace {image_path} by the theme image path
                 $slides_arr[$key]['image'] = preg_replace("/\{image_path\}/", $this->image_path, $image['image']);
             }
@@ -675,18 +655,18 @@ class Template
             'is404' => true
         ]);
 
-        $output  = $this->box(lang("404", "error"), $message);
+        $output = $this->box(lang("404", "error"), $message);
 
         $this->view($output);
 
-        $this->CI->output->_display();
+        $this->output->_display();
         exit();
     }
 
     /**
      * Show an error message
      *
-     * @param bool|String $error
+     * @param bool|string $error
      */
     public function showError(bool|string $error = false)
     {
@@ -695,21 +675,21 @@ class Template
             'errorMessage' => $error
         ]);
 
-        $output  = $this->box($error, $message);
+        $output = $this->box($error, $message);
 
         $this->view($output);
 
-        $this->CI->output->_display();
+        $this->output->_display();
         exit();
     }
 
     /**
      * Returns true if $a >= $b
      *
-     * @param String $a
-     * @param String $b
-     * @param Boolean $notEqual
-     * @return Boolean
+     * @param string $a
+     * @param string $b
+     * @param bool $notEqual
+     * @return bool
      */
     public function compareVersions(string $a, string $b, bool $notEqual = false): bool
     {
@@ -718,12 +698,9 @@ class Template
         $a = str_pad(preg_replace("/\./", "", $a), $maxLength, "0", STR_PAD_RIGHT);
         $b = str_pad(preg_replace("/\./", "", $b), $maxLength, "0", STR_PAD_RIGHT);
 
-        if ($notEqual)
-        {
+        if ($notEqual) {
             return (int) $a > (int) $b;
-        }
-        else
-        {
+        } else {
             return (int) $a >= (int) $b;
         }
     }
@@ -731,49 +708,45 @@ class Template
     /**
      * Format text
      *
-     * @param Mixed $text
-     * @param Boolean $nl2br
-     * @param Boolean $xss
-     * @param Boolean $break
+     * @param mixed $text
+     * @param bool $nl2br
+     * @param bool $xss
+     * @param bool $break
      * @return string
      */
     public function format(mixed $text, bool $nl2br = false, bool $xss = true, bool $break = false): mixed
     {
         // Prevent Cross-Site Scripting
-        if ($xss && is_string($text))
-        {
+        if ($xss && is_string($text)) {
             $text = $this->CI->security->xss_clean($text);
             $text = htmlspecialchars($text);
         }
 
         // Wordwrap
-        if ($break)
-        {
+        if ($break) {
             $text = wordwrap($text, $break, "<br />", true);
         }
 
         // Convert new lines to <br>
-        if ($nl2br)
-        {
+        if ($nl2br) {
             $text = nl2br($text);
         }
 
         return $text;
     }
-    
+
     /**
      * Format time as "XX days/hours/minutes/seconds"
      *
-     * @param Int $time
-     * @return String
+     * @param int $time
+     * @return string
      */
     public function formatTime(int $time): string
     {
-        if (!is_numeric($time))
-        {
+        if (!is_numeric($time)) {
             return "Not a number";
         }
-        
+
         $a = array(
             30 * 24 * 60 * 60 => 'month',
             24 * 60 * 60 => 'day',
@@ -782,14 +755,12 @@ class Template
             1 => 'second'
         );
 
-        foreach ($a as $secs => $str)
-        {
+        foreach ($a as $secs => $str) {
             $d = $time / $secs;
-            
-            if ($d >= 1)
-            {
+
+            if ($d >= 1) {
                 $r = round($d);
-                
+
                 return $r . ' ' . ($r > 1 ? lang($str . 's') : lang($str));
             }
         }
@@ -804,7 +775,7 @@ class Template
      */
     public function getDomainName(): string|array|null
     {
-        return preg_replace("/^[\w]{2,6}:\/\/([\w\d\.\-]+).*$/", "$1", $this->CI->config->slash_item('base_url'));
+        return preg_replace("/^[\w]{2,6}:\/\/([\w\d\.\-]+).*$/", "$1", $this->config->slash_item('base_url'));
     }
 
     /**
@@ -820,7 +791,7 @@ class Template
     /**
      * Add an extra page title
      *
-     * @param String $title
+     * @param string $title
      */
     public function setTitle(string $title): void
     {
@@ -830,7 +801,7 @@ class Template
     /**
      * Add an extra description
      *
-     * @param String $description
+     * @param string $description
      */
     public function setDescription(string $description): void
     {
@@ -840,7 +811,7 @@ class Template
     /**
      * Add extra keywords
      *
-     * @param String $keywords
+     * @param string $keywords
      */
     public function setKeywords(string $keywords): void
     {
@@ -882,7 +853,7 @@ class Template
         $menus = $this->CI->cache->get("ucp_menu_data");
 
         if ($menus === false) {
-            $menus = $this->CI->cms_model->getUcpMenu();
+            $menus = $this->cms_model->getUcpMenu();
             $this->CI->cache->save('ucp_menu_data', $menus, 86400); // 1 day
         }
 
@@ -897,7 +868,7 @@ class Template
             }
 
             if ($menu['permission'] == 'securityAccount') {
-                if ($this->CI->config->item('totp_secret')) {
+                if ($this->config->item('totp_secret')) {
                     $groupedMenus[$menu['group']][] = $menu;
                 }
                 continue;

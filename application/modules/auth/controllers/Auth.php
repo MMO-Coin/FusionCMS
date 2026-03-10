@@ -7,6 +7,7 @@ use MX\MX_Controller;
 /**
  * Auth Controller Class
  * @property login_model $login_model login_model Class
+ * @author   MMO-Coin <https://github.com/MMO-Coin/FusionCMS>
  */
 class Auth extends MX_Controller
 {
@@ -28,8 +29,7 @@ class Auth extends MX_Controller
     //Redirect to login
     public function index()
     {
-        if ($this->user->isOnline())
-        {
+        if ($this->user->isOnline()) {
             redirect($this->template->page_url . "ucp");
         } else {
             redirect($this->template->page_url . "login");
@@ -39,8 +39,7 @@ class Auth extends MX_Controller
     //Login page
     public function login()
     {
-        if ($this->user->isOnline())
-        {
+        if ($this->user->isOnline()) {
             redirect($this->template->page_url . "ucp");
         }
 
@@ -53,23 +52,22 @@ class Auth extends MX_Controller
             "has_smtp" => $this->config->item('has_smtp')
         ];
 
-        if ($use_captcha || (int)Services::session()->get('attempts') >= $this->config->item('captcha_attemps')) {
+        if ($use_captcha || (int) Services::session()->get('attempts') >= $this->config->item('captcha_attemps')) {
             $data["use_captcha"] = true;
         }
 
         $this->template->view($this->template->loadPage("page.tpl", array(
-                    "module" => "default", 
-                    "headline" => lang("log_in", "auth"),
-                    "class" => array("class" => "page_form"),
-                    "content" => $this->template->loadPage("login.tpl", $data)
-                )), "modules/auth/css/auth.css", "modules/auth/js/login.js");
+            "module" => "default",
+            "headline" => lang("log_in", "auth"),
+            "class" => array("class" => "page_form"),
+            "content" => $this->template->loadPage("login.tpl", $data)
+        )), "modules/auth/css/auth.css", "modules/auth/js/login.js");
 
     }
 
     public function register()
     {
-        if ($this->user->isOnline())
-        {
+        if ($this->user->isOnline()) {
             redirect($this->template->page_url . "ucp");
         }
 
@@ -84,13 +82,12 @@ class Auth extends MX_Controller
 
         $use_captcha = $this->config->item('use_captcha');
         $captcha_type = $this->config->item('captcha_type');
-        $show_captcha = $use_captcha == true || (int)Services::session()->get('attempts') >= $this->config->item('captcha_attemps');
+        $show_captcha = $use_captcha == true || (int) Services::session()->get('attempts') >= $this->config->item('captcha_attemps');
 
         $this->form_validation->set_rules('username', 'username', 'trim|required|min_length[4]|max_length[24]|alpha_numeric');
         $this->form_validation->set_rules('password', 'password', 'trim|required|min_length[6]');
 
-        if ($show_captcha && $captcha_type == 'inbuilt')
-        {
+        if ($show_captcha && $captcha_type == 'inbuilt') {
             $this->form_validation->set_rules('captcha', 'captcha', 'trim|required|exact_length[7]|alpha_numeric');
         }
 
@@ -101,8 +98,7 @@ class Auth extends MX_Controller
             "messages" => []
         ];
 
-        if ($this->form_validation->run())
-        {
+        if ($this->form_validation->run()) {
             //Get the players IP address
             $ip_address = $this->input->ip_address();
 
@@ -112,8 +108,7 @@ class Auth extends MX_Controller
             // Check attempts
             $this->increaseAttempts($ip_address);
 
-            if ($find && (time() < $find['block_until']))
-            {
+            if ($find && (time() < $find['block_until'])) {
                 // The IP address is blocked, calculate remaining minutes
                 $remaining_minutes = round(($find['block_until'] - time()) / 60);
                 $data["messages"]["error"] = lang("ip_blocked", "auth") . "<br>" . lang("try_again", "auth") . " " . $remaining_minutes . " " . lang("minutes", "auth");
@@ -121,8 +116,7 @@ class Auth extends MX_Controller
             }
 
             //Check captcha
-            if ($show_captcha)
-            {
+            if ($show_captcha) {
                 $data['showCaptcha'] = true;
                 if ($captcha_type == 'inbuilt' || !empty($this->input->post('captcha'))) {
                     if ($this->input->post('captcha') != $this->captcha->getValue() || empty($this->input->post('captcha'))) {
@@ -139,7 +133,7 @@ class Auth extends MX_Controller
                 } else if ($captcha_type == 'recaptcha3') {
                     $recaptcha = $this->input->post('recaptcha');
                     $score = $this->recaptcha->verifyScore($recaptcha);
-                    if($score < 0.5) {
+                    if ($score < 0.5) {
                         $data['messages']["error"] = lang("captcha_invalid", "auth");
                         die(json_encode($data));
                     }
@@ -154,18 +148,15 @@ class Auth extends MX_Controller
             $check = $this->user->setUserDetails($username, $sha_pass_hash["verifier"]);
 
             //if no errors, login
-            if ($check == 0)
-            {
+            if ($check == 0) {
                 $data["redirect"] = true;
 
                 unset($_SESSION['captcha']);
                 Services::session()->remove('attempts');
 
                 // Remember me
-                if (isset($_POST["remember"]))
-                {
-                    if($this->input->post("remember") == "true")
-                    {
+                if ($this->input->post("remember")) {
+                    if ($this->input->post("remember") == "true") {
                         $this->input->set_cookie("fcms_username", $username, 60 * 60 * 24 * 365);
                         $this->input->set_cookie("fcms_password", $sha_pass_hash["verifier"], 60 * 60 * 24 * 365);
                     }
@@ -177,15 +168,11 @@ class Auth extends MX_Controller
 
                 $this->login_model->deleteIP($ip_address);
                 $this->dblogger->createLog("user", "login", "Login");
-            }
-            else
-            {
+            } else {
                 $this->dblogger->createLog("user", "login", "Login", [], Dblogger::STATUS_FAILED, $this->user->getId($username));
                 $data["messages"]["error"] = lang("error", "auth");
             }
-        }
-        else
-        {
+        } else {
             $data['messages']["error"] = validation_errors();
         }
         die(json_encode($data));
@@ -196,15 +183,14 @@ class Auth extends MX_Controller
         $this->captcha->generate();
         $this->captcha->output();
     }
-    
+
     private function increaseAttempts($ip_address)
     {
         $find = $this->login_model->getIP($ip_address);
-        
+
         Services::session()->set('attempts', Services::session()->get('attempts') + 1);
 
-        if (!empty($find['attempts']))
-        {
+        if (!empty($find['attempts'])) {
             //Update failed login attempts and last_attempt
             $ip_data = array(
                 'attempts' => $find['attempts'] + 1,
@@ -212,9 +198,7 @@ class Auth extends MX_Controller
             );
 
             $this->login_model->updateIP($ip_address, $ip_data);
-        }
-        else
-        {
+        } else {
             $ip_data = array(
                 'ip_address' => $ip_address,
                 'attempts' => 1,
@@ -222,12 +206,11 @@ class Auth extends MX_Controller
             );
             $this->login_model->insertIP($ip_data);
         }
-        
+
         //Get new ip datas
         $find = $this->login_model->getIP($ip_address);
 
-        if (!empty($find['attempts']) && $find['attempts'] >= $this->config->item('block_attemps'))
-        {
+        if (!empty($find['attempts']) && $find['attempts'] >= $this->config->item('block_attemps')) {
             //Block the IP address
             $block_until = time() + ($this->config->item('block_duration') * 60);
             $block_data = array(
@@ -241,8 +224,7 @@ class Auth extends MX_Controller
     //Two-Factor page
     public function security()
     {
-        if ($this->external_account_model->getTotpSecret() == null || ($this->user->getTotpSecret() == $this->external_account_model->getTotpSecret()))
-        {
+        if ($this->external_account_model->getTotpSecret() == null || ($this->user->getTotpSecret() == $this->external_account_model->getTotpSecret())) {
             redirect($this->template->page_url . "ucp");
         }
 
@@ -263,6 +245,15 @@ class Auth extends MX_Controller
     {
         if (!$this->input->is_ajax_request())
             exit('No direct script access allowed');
+
+        if (!Services::throttler()->check('totp_login', 5, MINUTE)) {
+            $data = [
+                'status' => false,
+                'icon' => 'error',
+                'text' => lang('ip_blocked', 'auth')
+            ];
+            die(json_encode($data));
+        }
 
         $digit = $this->input->post('digit');
 

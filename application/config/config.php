@@ -26,7 +26,7 @@ if (! defined('BASEPATH')) {
 | a PHP script and you can easily do that on your own.
 |
 */
-$config['base_url'] = (is_https() ? 'https://' : 'http://').($_SERVER['HTTP_HOST'] ?? '').substr($_SERVER['SCRIPT_NAME'], 0, strpos($_SERVER['SCRIPT_NAME'], basename($_SERVER['SCRIPT_FILENAME'])));
+$config['base_url'] = (is_https() ? 'https://' : 'http://') . ($_SERVER['HTTP_HOST'] ?? '') . substr($_SERVER['SCRIPT_NAME'], 0, strpos($_SERVER['SCRIPT_NAME'], basename($_SERVER['SCRIPT_FILENAME'])));
 
 /*
 |--------------------------------------------------------------------------
@@ -229,8 +229,8 @@ $config['encryption_key'] = '';
 $config['cookie_prefix'] = '';
 $config['cookie_domain'] = '';
 $config['cookie_path'] = '/';
-$config['cookie_secure'] = false;
-$config['cookie_httponly'] = false;
+$config['cookie_secure'] = is_https();
+$config['cookie_httponly'] = true;
 $config['cookie_samesite'] = 'Lax';
 
 /*

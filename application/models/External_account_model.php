@@ -95,21 +95,21 @@ class External_account_model extends CI_Model
     {
         switch ($encryption) {
             case 'SPH':
-                if (column('account', 'verifier') && column('account', 'salt')){
+                if (column('account', 'verifier') && column('account', 'salt')) {
                     unset($columns[column('account', 'verifier')]);
                     unset($columns[column('account', 'salt')]);
                 }
                 break;
             case 'SRP':
-                if (column('account', 'sha_pass_hash')){
+                if (column('account', 'sha_pass_hash')) {
                     unset($columns[column('account', 'sha_pass_hash')]);
                 }
                 break;
             case 'SRP6':
-                if (column('account', 'sha_pass_hash')){
+                if (column('account', 'sha_pass_hash')) {
                     unset($columns[column('account', 'sha_pass_hash')]);
                 }
-                if (column('account', 'v') && column('account', 's')){
+                if (column('account', 'v') && column('account', 's')) {
                     unset($columns[column('account', 'v')]);
                     unset($columns[column('account', 's')]);
                 }
@@ -156,9 +156,9 @@ class External_account_model extends CI_Model
     /**
      * Create a new account
      *
-     * @param String $username
-     * @param String $password
-     * @param String $email
+     * @param string $username
+     * @param string $password
+     * @param string $email
      */
     public function createAccount(string $username, string $password, string $email)
     {
@@ -177,15 +177,13 @@ class External_account_model extends CI_Model
 
         list($hash, $data) = $this->setAccountPassword($encryption, $username, $password, $data);
 
-        if (!preg_match("/^cmangos/i", get_class($this->realms->getEmulator())))
-        {
+        if (!preg_match("/^cmangos/i", get_class($this->realms->getEmulator()))) {
             $data[column("account", "last_ip")] = $this->input->ip_address();
         }
 
         $userId = $this->connection->table(table("account"))->insert($data);
 
-        if (preg_match("/^cmangos/i", get_class($this->realms->getEmulator())))
-        {
+        if (preg_match("/^cmangos/i", get_class($this->realms->getEmulator()))) {
             $ip_data = [
                 'accountId' => $userId,
                 'ip' => $this->input->ip_address(),
@@ -216,10 +214,10 @@ class External_account_model extends CI_Model
         // Fix for TrinityCore RBAC (or any emulator with 'rbac')
         if ($this->config->item('rbac')) {
             $rbac_data = [
-                'accountId'    => $userId,
+                'accountId' => $userId,
                 'permissionId' => 195,
-                'granted'      => 1,
-                'realmId'      => -1
+                'granted' => 1,
+                'realmId' => -1
             ];
             $this->connection->table('rbac_account_permissions')->insert($rbac_data);
         }
@@ -231,9 +229,9 @@ class External_account_model extends CI_Model
     {
         $query = $this->db->query("SELECT COUNT(*) AS `total` FROM daily_signups WHERE `date`=?", [date("Y-m-d")]);
 
-        $row = $query->getResultArray();
+        $row = $query->getRowArray();
 
-        if ($row[0]['total']) {
+        if ($row['total']) {
             $this->db->query("UPDATE daily_signups SET amount = amount + 1 WHERE `date`=?", [date("Y-m-d")]);
         } else {
             $this->db->query("INSERT INTO daily_signups(`date`, amount) VALUES(?, ?)", [date("Y-m-d"), 1]);
@@ -243,37 +241,34 @@ class External_account_model extends CI_Model
     /**
      * Get the banned status
      *
-     * @param Int $id
-     * @return Boolean
+     * @param int $id
+     * @return array|bool
      */
-    public function getBannedStatus(int $id)
+    public function getBannedStatus(int $id): array|bool
     {
         $this->connect();
 
         $query = $this->connection->query(query("get_banned"), [$id]);
 
         if ($query->getNumRows() > 0) {
-            $row = $query->getResultArray();
-
-            return $row[0];
+            return $query->getRowArray();
         } elseif (query('get_ip_banned')) {
             //check if the ip is banned
             $query = $this->connection->query(query("get_ip_banned"), [$this->input->ip_address(), time()]);
 
             if ($query->getNumRows() > 0) {
-                $row = $query->getResultArray();
-
-                return $row[0];
+                return $query->getRowArray();
             } else {
                 return false;
             }
         }
+        return false;
     }
 
     /**
      * Get the rank
      *
-     * @param bool|String $value
+     * @param bool|string $value
      * @param bool $isUsername
      * @return int
      */
@@ -290,13 +285,13 @@ class External_account_model extends CI_Model
         $query = $this->connection->query(query("get_rank"), [$value]);
 
         if ($query->getNumRows() > 0) {
-            $row = $query->getResultArray();
+            $row = $query->getRowArray();
 
-            if ($row[0]["gmlevel"] == "") {
-                $row[0]["gmlevel"] = 0;
+            if ($row["gmlevel"] == "") {
+                $row["gmlevel"] = 0;
             }
 
-            return $row[0]["gmlevel"];
+            return $row["gmlevel"];
         } else {
             return 0;
         }
@@ -305,8 +300,8 @@ class External_account_model extends CI_Model
     /**
      * Check if a username exists
      *
-     * @param String $username
-     * @return Boolean
+     * @param string $username
+     * @return bool
      */
     public function usernameExists(string $username): bool
     {
@@ -324,16 +319,16 @@ class External_account_model extends CI_Model
     /**
      * Get total amount of accounts
      *
-     * @return Int
+     * @return int
      */
     public function getAccountCount(): int
     {
         $this->connect();
 
         $query = $this->connection->query("SELECT COUNT(*) as `total` FROM " . table("account"));
-        $row = $query->getResultArray();
+        $row = $query->getRowArray();
 
-        return $row[0]['total'];
+        return (int) $row['total'];
     }
 
     /**
@@ -399,7 +394,7 @@ class External_account_model extends CI_Model
         if (column("account", "v") && column("account", "s") && column("account", "sessionkey")) {
             $data = [
                 column("account", "v") => "",
-                column("account", "s")  => "",
+                column("account", "s") => "",
                 column("account", "sessionkey") => "",
             ];
         }
@@ -441,8 +436,7 @@ class External_account_model extends CI_Model
 
         $builder = $this->connection->table(table("account"));
 
-        if ($username)
-        {
+        if ($username) {
             // Update only the expansion column for the given username
             $builder->where(column("account", "username"), $username);
         }
@@ -510,22 +504,22 @@ class External_account_model extends CI_Model
     /**
      * Get the username
      *
-     * @param  Int $id
-     * @return String
+     * @param int|bool $id
+     * @return string
      */
-    public function getUsername($id = false)
+    public function getUsername(int|bool $id = false): string
     {
         if (!$id) {
-            return $this->username;
+            return $this->username ?? '';
         } else {
             $this->connect();
 
             $query = $this->connection->table(table("account"))->select(column("account", "username", true))->where([column("account", "id") => $id])->get();
 
             if ($query->getNumRows() > 0) {
-                $result = $query->getResultArray();
+                $result = $query->getRowArray();
 
-                return $result[0]["username"];
+                return $result["username"];
             } else {
                 return "Unknown";
             }
@@ -533,12 +527,13 @@ class External_account_model extends CI_Model
     }
 
     /**
-     * Get the username
+     * Get the info
      *
-     * @param  Int $id
-     * @return String
+     * @param int|bool $id
+     * @param string|array $fields
+     * @return array|bool
      */
-    public function getInfo($id = false, $fields = "*")
+    public function getInfo(int|bool $id = false, string|array $fields = "*"): array|bool
     {
         if (!$id) {
             $id = $this->id;
@@ -555,9 +550,7 @@ class External_account_model extends CI_Model
         $query = $this->connection->table(table("account"))->select($fields)->where([column("account", "id") => $id])->get();
 
         if ($query->getNumRows() > 0) {
-            $result = $query->getResultArray();
-
-            return $result[0];
+            return $query->getRowArray();
         } else {
             return false;
         }

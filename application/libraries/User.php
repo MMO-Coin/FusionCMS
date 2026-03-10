@@ -14,6 +14,7 @@ if (!defined('BASEPATH')) {
  * @author  Elliott Robbins
  * @author  Keramat Jokar (Nightprince) <https://github.com/Nightprince>
  * @author  Ehsan Zare (Darksider) <darksider.legend@gmail.com>
+ * @author  MMO-Coin <https://github.com/MMO-Coin/FusionCMS>
  * @link    https://github.com/FusionWowCMS/FusionCMS
  */
 
@@ -34,6 +35,7 @@ class User
     private ?string $last_ip;
     private ?string $nickname;
     private ?string $totp_secret;
+    private ?int $avatarId;
 
     public function __construct()
     {
@@ -47,8 +49,8 @@ class User
     /**
      * Creates a hash of the password we enter
      *
-     * @param String $username
-     * @param String $password in plain text
+     * @param string $username
+     * @param string $password in plain text
      * @return array hashed password
      */
     public function getAccountPassword(string $username, string $password): array
@@ -69,9 +71,9 @@ class User
     /**
      * When they log in, this should be called to set all the user details.
      *
-     * @param String $username
-     * @param String $password
-     * @return Int
+     * @param string $username
+     * @param string $password
+     * @return int
      */
     public function setUserDetails(string $username, string $password): int
     {
@@ -79,7 +81,7 @@ class User
 
         if (!$check) {
             return 1;
-        } elseif (strtoupper($this->CI->external_account_model->getPassword()) == strtoupper($password)) {
+        } elseif (hash_equals(strtoupper($this->CI->external_account_model->getPassword()), strtoupper($password))) {
             // Load the internal values (vp, dp etc.)
             $this->CI->internal_user_model->initialize($this->CI->external_account_model->getId());
 
@@ -95,6 +97,9 @@ class User
                 'nickname' => $this->CI->internal_user_model->getNickname(),
                 'language' => $this->CI->internal_user_model->getLanguage(),
             ];
+
+            // Regenerate session ID to prevent fixation
+            Services::session()->regenerate();
 
             // Set the session with the above data
             Services::session()->set($userdata);
@@ -113,7 +118,7 @@ class User
      * Check if the user rank has any staff permissions
      *
      * @param int|bool $id
-     * @return     Boolean
+     * @return     bool
      * @deprecated 6.1
      */
     public function isStaff(int|bool $id = false): bool
@@ -126,7 +131,7 @@ class User
      * Uses [view, mod] ACL permission as of 6.1, for backwards compatibility
      *
      * @param int|bool $id
-     * @return     Boolean
+     * @return     bool
      * @deprecated 6.1
      */
     public function isGm(int|bool $id = false): bool
@@ -139,7 +144,7 @@ class User
      * Uses [view, mod] ACL permission as of 6.1, for backwards compatibility
      *
      * @param int|bool $id
-     * @return     Boolean
+     * @return     bool
      * @deprecated 6.1
      */
     public function isDev(int|bool $id = false): bool
@@ -152,7 +157,7 @@ class User
      * Uses [view, admin] ACL permission as of 6.1, for backwards compatibility
      *
      * @param int|bool $id
-     * @return     Boolean
+     * @return     bool
      * @deprecated 6.1
      */
     public function isAdmin(int|bool $id = false): bool
@@ -165,7 +170,7 @@ class User
      * Uses [view, admin] ACL permission as of 6.1, for backwards compatibility
      *
      * @param int|bool $id
-     * @return     Boolean
+     * @return     bool
      * @deprecated 6.1
      */
     public function isOwner(int|bool $id = false): bool
@@ -234,7 +239,7 @@ class User
     /**
      * Whether the user is online or not
      *
-     * @return Boolean
+     * @return bool
      */
     public function isOnline(): bool
     {
@@ -265,7 +270,7 @@ class User
             $this->dp = false;
         } else {
             $this->id = 0;
-            $this->username =  0;
+            $this->username = 0;
             $this->password = 0;
             $this->email = null;
             $this->expansion = 0;
@@ -276,7 +281,6 @@ class User
             $this->last_ip = null;
             $this->totp_secret = null;
             $this->nickname = null;
-
         }
 
         $this->CI->language->setLanguage(Services::session()->get('language') ? Services::session()->get('language') : $this->CI->config->item('language'));
@@ -286,7 +290,7 @@ class User
      * Check if the account is banned or active
      *
      * @param bool|int $id
-     * @return String
+     * @return string
      */
     public function getAccountStatus(bool|int $id = false): string
     {
@@ -299,7 +303,7 @@ class User
         if (!$result) {
             return 'Active';
         } else {
-            if (array_key_exists("banreason", $result)) {
+            if ($result && is_array($result) && array_key_exists("banreason", $result)) {
                 return '<span style="color:red;cursor:pointer;" data-tip="<b>' . lang("reason") . '</b> ' . $result['banreason'] . '">' . lang("banned") . ' (?)</span>';
             } else {
                 return '<span style="color:red;">' . ucfirst(lang("banned")) . '</span>';
@@ -310,22 +314,22 @@ class User
     /**
      * Get the nickname
      *
-     * @param bool|Int $id
+     * @param bool|int $id
      * @return string|null
      */
-    public function getNickname(bool|int $id = false): string | null
+    public function getNickname(bool|int $id = false): string|null
     {
         return $this->CI->internal_user_model->getNickname($id);
     }
 
     /**
      * Get the user's avatar
-     * @param bool|Int $id
+     * @param bool|int $id
      * @return string
      */
     public function getAvatar(bool|int $id = false): string
     {
-        return base_url() . basename(APPPATH) . "/images/avatar/". $this->CI->internal_user_model->getAvatar($id);
+        return base_url() . basename(APPPATH) . "/images/avatar/" . $this->CI->internal_user_model->getAvatar($id);
     }
 
     /**
@@ -362,7 +366,7 @@ class User
                     //Execute queries on it by getting the connection
                     $characters = $character->getCharactersByAccount($this->id);
 
-                    $character_data = array('realmId' => $realm->getId(),'realmName' => $realm->getName(), 'characters' => $characters);
+                    $character_data = array('realmId' => $realm->getId(), 'realmName' => $realm->getName(), 'characters' => $characters);
 
                     $out[] = $character_data;
                 }
@@ -379,7 +383,7 @@ class User
                 //Execute queries on it by getting the connection
                 $characters = $character->getCharactersByAccount($this->id);
 
-                return array('realmId' => $realm->getId(),'realmName' => $realm->getName(), 'characters' => $characters);
+                return array('realmId' => $realm->getId(), 'realmName' => $realm->getName(), 'characters' => $characters);
             }
         } else {
             return false;
@@ -405,7 +409,7 @@ class User
      * Get the username of the current user or the given id.
      *
      * @param int|bool $id
-     * @return String
+     * @return string
      */
     public function getUsername(int|bool $id = false): string
     {
@@ -415,7 +419,7 @@ class User
     /**
      * Get the password of the user
      *
-     * @return String
+     * @return string
      */
     public function getPassword(): string
     {
@@ -497,7 +501,7 @@ class User
      *
      * @return string|null
      */
-    public function getLastIP(): string | null
+    public function getLastIP(): string|null
     {
         return $this->last_ip;
     }
@@ -507,7 +511,7 @@ class User
      *
      * @return string|null
      */
-    public function getTotpSecret(): string | null
+    public function getTotpSecret(): string|null
     {
         return $this->totp_secret;
     }
@@ -598,7 +602,7 @@ class User
     /**
      * Set the expansion of the user
      *
-     * @param $newExpansion
+     * @param int $newExpansion
      */
     public function setExpansion($newExpansion): void
     {
@@ -609,7 +613,7 @@ class User
     /**
      * Set the amount of vp for the user
      *
-     * @param $newVp
+     * @param int $newVp
      */
     public function setVp($newVp): void
     {
@@ -620,7 +624,7 @@ class User
     /**
      * Set the amount of dp for the user
      *
-     * @param $newDp
+     * @param int $newDp
      */
     public function setDp($newDp): void
     {
@@ -630,7 +634,7 @@ class User
 
     /**
      * Set the avatar id of the user
-     * @param $newAvatarId
+     * @param int $newAvatarId
      */
     public function setAvatar($newAvatarId): void
     {

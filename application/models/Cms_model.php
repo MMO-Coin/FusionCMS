@@ -4,6 +4,7 @@ use App\Config\Services;
 
 /**
  * @package FusionCMS
+ * @author  MMO-Coin <https://github.com/MMO-Coin/FusionCMS>
  * @link    https://github.com/FusionWowCMS/FusionCMS
  */
 
@@ -28,8 +29,8 @@ class Cms_model extends CI_Model
 
     private function logVisit(): void
     {
-        if (!$this->input->is_ajax_request() && !isset($_GET['is_json_ajax'])) {
-            $ip   = $this->input->ip_address();
+        if (!$this->input->is_ajax_request() && !$this->input->get('is_json_ajax')) {
+            $ip = $this->input->ip_address();
             $date = date("Y-m-d");
 
             $exists = $this->db->table('visitor_log')
@@ -42,8 +43,8 @@ class Cms_model extends CI_Model
 
             if (!$exists) {
                 $this->db->table('visitor_log')->insert([
-                    'date'      => $date,
-                    'ip'        => $ip,
+                    'date' => $date,
+                    'ip' => $ip,
                     'timestamp' => time()
                 ]);
             }
@@ -54,21 +55,21 @@ class Cms_model extends CI_Model
     {
         // Query: Prepare
         $query = $this->db->table('sideboxes')
-                          ->select('*')
-                          ->orderBy('order', 'ASC');
+            ->select('*')
+            ->orderBy('order', 'ASC');
 
         // Query: Filter (Page)
-        if($page && $page !== '*')
+        if ($page && $page !== '*')
             $query = $query->groupStart()
-                           ->like('pages', str_replace(':page', $page, '":page"'), 'both')
-                           ->orLike('pages', '"*"', 'both')
-                           ->groupEnd();
+                ->like('pages', str_replace(':page', $page, '":page"'), 'both')
+                ->orLike('pages', '"*"', 'both')
+                ->groupEnd();
 
         // Query: Execute
         $query = $query->get();
 
         // Query: Make sure we have results
-        if($query->getNumRows())
+        if ($query->getNumRows())
             return $query->getResultArray();
 
         return [];
@@ -134,8 +135,8 @@ class Cms_model extends CI_Model
         $query = $this->db->query("SELECT id FROM `ranks` ORDER BY id ASC LIMIT 1");
 
         if ($query->getNumRows() > 0) {
-            $result = $query->getResultArray();
-            return $result[0]['id'];
+            $result = $query->getRowArray();
+            return $result['id'];
         }
 
         return false;
@@ -176,7 +177,7 @@ class Cms_model extends CI_Model
     /**
      * Get the realm database information
      *
-     * @param Int $id
+     * @param int $id
      * @return array|null
      */
     public function getRealm(int $id): ?array
@@ -197,8 +198,8 @@ class Cms_model extends CI_Model
             $query = $this->db->query("SELECT backup_name FROM backup where id = ?", [$id]);
 
             if ($query->getNumRows() > 0) {
-                $result = $query->getResultArray();
-                return $result[0]['backup_name'];
+                $result = $query->getRowArray();
+                return $result['backup_name'];
             } else {
                 return false;
             }
@@ -218,8 +219,8 @@ class Cms_model extends CI_Model
         $query = $this->db->table('backup')->select("COUNT(id) 'count'")->get();
 
         if ($query->getNumRows() > 0) {
-            $result = $query->getResultArray();
-            return $result[0]['count'];
+            $result = $query->getRowArray();
+            return $result['count'];
         }
 
         return null;
@@ -235,9 +236,7 @@ class Cms_model extends CI_Model
         $query = $this->db->query("SELECT * FROM email_templates WHERE id= ? LIMIT 1", [$id]);
 
         if ($query->getNumRows() > 0) {
-            $row = $query->getResultArray();
-
-            return $row[0];
+            return $query->getRowArray();
         } else {
             return false;
         }
@@ -270,18 +269,25 @@ class Cms_model extends CI_Model
 
     private function setLangugage()
     {
-        $langs = $this->agent->languages();
+        $supported_languages = $this->config->item('supported_languages');
+        if (!is_array($supported_languages)) {
+            $supported_languages = [];
+        }
 
-        foreach ($langs as $lang) {
+        $langs = [Services::request()->negotiate('language', $supported_languages) ?? $this->config->item('language')];
+
+        $lang = '';
+        foreach ($langs as $lang_item) {
             // Check if its in the array
-            if (in_array($lang, array_keys($this->config->item('supported_languages')))) {
-                $setLang = $this->config->item('supported_languages')[$lang]['name'];
+            if (in_array($lang_item, array_keys($supported_languages))) {
+                $setLang = $supported_languages[$lang_item]['name'];
+                $lang = $lang_item;
                 break;
             }
         }
 
         // If no language has been worked out - or it is not supported - use the default
-        if (!in_array($lang, array_keys($this->config->item('supported_languages')))) {
+        if (!isset($setLang) || !in_array($lang, array_keys($supported_languages))) {
             $setLang = $this->config->item('default_language');
         }
 
@@ -318,8 +324,7 @@ class Cms_model extends CI_Model
         $builder->where('read', 0);
         $query = $builder->get();
 
-        if($query->getNumRows() > 0)
-        {
+        if ($query->getNumRows() > 0) {
             $result = $query->getResultArray();
 
             return $result[0]['total'];

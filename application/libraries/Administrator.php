@@ -14,7 +14,19 @@ if (!defined('BASEPATH')) {
  * @author  Elliott Robbins
  * @author  Keramat Jokar (Nightprince) <https://github.com/Nightprince>
  * @author  Ehsan Zare (Darksider) <darksider.legend@gmail.com>
+ * @author  MMO-Coin <https://github.com/MMO-Coin/FusionCMS>
  * @link    https://github.com/FusionWowCMS/FusionCMS
+ */
+/**
+ * @property-read \Smartyengine $smarty
+ * @property-read \User $user
+ * @property-read \MX\MX_Router $router
+ * @property-read \Cms_model $cms_model
+ * @property-read \Acl_model $acl_model
+ * @property-read \CI_Input $input
+ * @property-read \Template $template
+ * @property-read \Language $language
+ * @property-read \CI_Config $config
  */
 class Administrator
 {
@@ -36,16 +48,21 @@ class Administrator
         $this->title = '';
         $this->currentPage = '';
 
-        if (!$this->CI->user->isStaff()) {
+        if (!hasPermission('view', 'gm')) {
             show_404('admin', false);
         }
 
         $this->showLogIn();
 
-        if (!$this->CI->input->is_ajax_request() && !isset($_GET['is_json_ajax'])) {
+        if (!$this->input->is_ajax_request() && !$this->input->get('is_json_ajax')) {
             $this->loadModules();
             $this->getMenuLinks();
         }
+    }
+
+    public function __get($variable)
+    {
+        return $this->CI->$variable;
     }
 
     /**
@@ -53,14 +70,14 @@ class Administrator
      */
     private function logIn()
     {
-        $security_code = $this->CI->input->post('security_code');
+        $security_code = $this->input->post('security_code');
 
         // Make sure the user has permission to view the admin panel
         if (!hasPermission("view", "admin")) {
             die("permission");
         }
 
-        if ($security_code == $this->CI->config->item('security_code')) {
+        if ($security_code == $this->config->item('security_code')) {
             Services::session()->set(['admin_access' => true]);
 
             die("welcome");
@@ -72,7 +89,7 @@ class Administrator
     /**
      * Add an extra page title
      *
-     * @param String $title
+     * @param string $title
      */
     public function setTitle(string $title): void
     {
@@ -107,28 +124,32 @@ class Administrator
                     if (!$this->modules[$name]) {
                         die("The module <b>" . $name . "</b> is missing manifest.json");
                     } else {
-                        $this->modules[$name] = json_decode($this->modules[$name], true);
+                        $manifestData = json_decode($this->modules[$name], true);
 
-                        // Add the module folder name as name if none was specified
-                        if (!array_key_exists("name", $this->modules[$name])) {
-                            $this->modules[$name]['name'] = $name;
-                        }
+                        if (is_array($manifestData)) {
+                            // Add the module folder name as name if none was specified
+                            if (!array_key_exists("name", $manifestData)) {
+                                $manifestData['name'] = $name;
+                            }
 
-                        // Add the enabled disabled setting, DEFAULT: disabled
-                        if (!array_key_exists("enabled", $this->modules[$name])) {
-                            $this->modules[$name]["enabled"] = false;
-                        }
+                            // Add the enabled disabled setting, DEFAULT: disabled
+                            if (!array_key_exists("enabled", $manifestData)) {
+                                $manifestData["enabled"] = false;
+                            }
 
-                        // Add default description if none was specified
-                        if (!array_key_exists("description", $this->modules[$name])) {
-                            $this->modules[$name]['description'] = "This module has no description";
-                        }
+                            // Add default description if none was specified
+                            if (!array_key_exists("description", $manifestData)) {
+                                $manifestData['description'] = "This module has no description";
+                            }
 
-                        // Check if the module has any configs
-                        if ($this->hasConfigs($name)) {
-                            $this->modules[$name]['has_configs'] = true;
-                        } else {
-                            $this->modules[$name]['has_configs'] = false;
+                            // Check if the module has any configs
+                            if ($this->hasConfigs($name)) {
+                                $manifestData['has_configs'] = true;
+                            } else {
+                                $manifestData['has_configs'] = false;
+                            }
+
+                            $this->modules[$name] = $manifestData;
                         }
                     }
                 }
@@ -139,8 +160,8 @@ class Administrator
     /**
      * Get the module name out of the path
      *
-     * @param String $path
-     * @return String
+     * @param string $path
+     * @return string
      */
     private function getModuleName(string $path = ""): string
     {
@@ -150,8 +171,8 @@ class Administrator
     /**
      * Check if the module has any configs
      *
-     * @param String $moduleName
-     * @return Boolean
+     * @param string $moduleName
+     * @return bool
      */
     public function hasConfigs(string $moduleName): bool
     {
@@ -178,41 +199,45 @@ class Administrator
             $adminManifests = isset($manifest['admin']['group']) ? array($manifest['admin']) : $manifest['admin'];
 
             foreach ($adminManifests as $menuGroup) {
-                $text = $menuGroup['text'];
-                $icon = $menuGroup['icon'];
+                if (is_array($menuGroup) && isset($menuGroup['text']) && isset($menuGroup['icon'])) {
+                    $text = $menuGroup['text'];
+                    $icon = $menuGroup['icon'];
 
-                if (!isset($this->menu[$text])) {
-                    $this->menu[$text] = ['links' => [], 'icon' => $icon];
-                }
-
-                $currentPageSet = false;
-
-                $currentModule = $this->CI->router->fetch_module();
-                $currentClass = $this->CI->router->fetch_class();
-                $currentMethod = $this->CI->router->fetch_method();
-
-                foreach ($menuGroup['links'] as $link) {
-                    if (!empty($link['requirePermission']) && !hasPermission($link['requirePermission'], $module)) {
-                        continue;
+                    if (!isset($this->menu[$text])) {
+                        $this->menu[$text] = ['links' => [], 'icon' => $icon];
                     }
 
-                    $linkModule = $link['module'] = $module;
+                    $currentPageSet = false;
 
-                    if ($currentModule == $linkModule) {
-                        $url = $currentClass . ($currentMethod != "index" ? "/" . $currentMethod : "");
+                    $currentModule = $this->router->module;
+                    $currentClass = $this->router->class;
+                    $currentMethod = $this->router->method;
 
-                        if ($url == $link['controller']) {
-                            $link['active'] = true;
-                            $this->currentPage = "$module/" . $link['controller'];
-                            $currentPageSet = true;
+                    if (isset($menuGroup['links']) && is_array($menuGroup['links'])) {
+                        foreach ($menuGroup['links'] as $link) {
+                            if (!empty($link['requirePermission']) && !hasPermission($link['requirePermission'], $module)) {
+                                continue;
+                            }
+
+                            $linkModule = $link['module'] = $module;
+
+                            if ($currentModule == $linkModule) {
+                                $url = $currentClass . ($currentMethod != "index" ? "/" . $currentMethod : "");
+
+                                if ($url == $link['controller']) {
+                                    $link['active'] = true;
+                                    $this->currentPage = "$module/" . $link['controller'];
+                                    $currentPageSet = true;
+                                }
+                            }
+
+                            $this->menu[$text]['links'][] = $link;
                         }
                     }
 
-                    $this->menu[$text]['links'][] = $link;
-                }
-
-                if (!$currentPageSet && $currentModule == "admin") {
-                    $this->currentPage = $currentClass;
+                    if (!$currentPageSet && $currentModule == "admin") {
+                        $this->currentPage = $currentClass;
+                    }
                 }
             }
         }
@@ -221,13 +246,13 @@ class Administrator
     /**
      * Loads the template
      *
-     * @param String $content The page content
-     * @param bool|String $css Full path to your css file
-     * @param bool|String $js Full path to your js file
+     * @param string $content The page content
+     * @param bool|string $css Full path to your css file
+     * @param bool|string $js Full path to your js file
      */
     public function view(string $content, bool|string $css = false, bool|string $js = false)
     {
-        if ($this->CI->input->is_ajax_request() && isset($_GET['is_json_ajax']) && $_GET['is_json_ajax'] == 1) {
+        if ($this->input->is_ajax_request() && $this->input->get('is_json_ajax') == 1) {
             $array = [
                 "title" => ($this->title) ? $this->title : "",
                 "content" => $content,
@@ -253,27 +278,27 @@ class Administrator
         }
 
 
-        $notifications = $this->CI->cms_model->getNotifications($this->CI->user->getId(), true);
+        $notifications = $this->cms_model->getNotifications($this->user->getId(), true);
 
         // Gather the theme data
         $data = [
             "page" => '<div id="content_ajax">' . $content . '</div>',
-            "url" => $this->CI->template->page_url,
+            "url" => $this->template->page_url,
             "menu" => $menu,
             "title" => $this->title,
             "extra_js" => $js,
             "extra_css" => $css,
-            "nickname" => $this->CI->user->getNickname(),
+            "nickname" => $this->user->getNickname(),
             "current_page" => $this->currentPage,
-            "defaultLanguage" => $this->CI->config->item('language'),
+            "defaultLanguage" => $this->config->item('language'),
             "client_language" => $this->CI->language->getClientData(),
             "languages" => $this->CI->language->getAllLanguages(),
             "abbreviationLanguage" => $this->CI->language->getAbbreviationByLanguage($this->CI->language->getLanguage()),
-            "serverName" => $this->CI->config->item('server_name'),
-            "avatar"    => $this->CI->user->getAvatar($this->CI->user->getId()),
-            "groups" => $this->CI->acl_model->getGroupsByUser(),
+            "serverName" => $this->config->item('server_name'),
+            "avatar" => $this->user->getAvatar($this->user->getId()),
+            "groups" => $this->acl_model->getGroupsByUser(),
             "notifications" => $notifications,
-            "cdn_link" => $this->CI->config->item('cdn') === true ? $this->CI->config->item('cdn_link') : null
+            "cdn_link" => $this->config->item('cdn') === true ? $this->config->item('cdn_link') : null
         ];
 
         // Load the main template
@@ -285,12 +310,12 @@ class Administrator
     /**
      * Shorthand for loading a content box
      *
-     * @param String $title
-     * @param String $body
-     * @param Boolean $full
-     * @param bool|String $css
-     * @param bool|String $js
-     * @return String
+     * @param string $title
+     * @param string $body
+     * @param bool $full
+     * @param bool|string $css
+     * @param bool|string $js
+     * @return string
      */
     public function box(string $title, string $body, bool $full = false, bool|string $css = false, bool|string $js = false)
     {
@@ -302,7 +327,7 @@ class Administrator
         $page = $this->CI->smarty->view($this->theme_path . 'box.tpl', $data, true);
 
         if ($full) {
-            $this->view($page, $css, $js);
+            return $this->view($page, $css, $js);
         } else {
             return $page;
         }
@@ -311,22 +336,22 @@ class Administrator
     /**
      * Get the FusionCMS version
      *
-     * @return String
+     * @return string
      */
     public function getVersion(): string
     {
-        return $this->CI->config->item('FusionCMSVersion');
+        return $this->config->item('FusionCMSVersion');
     }
 
     /**
      * Get if the module is enabled or not
      *
      * @param $moduleName
-     * @return Boolean
+     * @return bool
      */
-    public function isEnabled($moduleName): mixed
+    public function isEnabled($moduleName): bool
     {
-        return $this->modules[$moduleName]["enabled"];
+        return (bool) $this->modules[$moduleName]["enabled"];
     }
 
     public function getEnabledModules(): array
@@ -361,16 +386,16 @@ class Administrator
     private function showLogIn()
     {
         if (!Services::session()->get('admin_access') || !hasPermission("view", "admin")) {
-            if ($this->CI->input->post('send')) {
+            if ($this->input->post('send')) {
                 $this->logIn();
             } else {
-                if (!$this->CI->input->is_ajax_request() && !isset($_GET['is_json_ajax'])) {
+                if (!$this->input->is_ajax_request() && !$this->input->get('is_json_ajax')) {
                     $data = [
-                        "url" => $this->CI->template->page_url,
-                        "isOnline" => $this->CI->user->isOnline(),
-                        "username" => $this->CI->user->getUsername(),
-                        "avatar"    => $this->CI->user->getAvatar($this->CI->user->getId()),
-                        "cdn_link" => $this->CI->config->item('cdn') === true ? $this->CI->config->item('cdn_link') : null
+                        "url" => $this->template->page_url,
+                        "isOnline" => $this->user->isOnline(),
+                        "username" => $this->user->getUsername(),
+                        "avatar" => $this->user->getAvatar($this->user->getId()),
+                        "cdn_link" => $this->config->item('cdn') === true ? $this->config->item('cdn_link') : null
                     ];
 
                     $output = $this->CI->smarty->view($this->theme_path . "login.tpl", $data, true);
