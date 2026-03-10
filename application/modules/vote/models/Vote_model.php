@@ -54,7 +54,7 @@ class Vote_model extends CI_Model
 
     public function getTopsite($id)
     {
-        $query = $this->db->query("SELECT * FROM vote_sites WHERE id=?", array($id));
+        $query = $this->db->query("SELECT * FROM vote_sites WHERE id=?", [$id]);
 
         if ($query->getNumRows()) {
             $result = $query->getResultArray();
@@ -70,7 +70,7 @@ class Vote_model extends CI_Model
      */
     public function getVoteSiteByUrl($url)
     {
-        $query = $this->db->query("SELECT * FROM vote_sites WHERE vote_url LIKE '%" . $url . "%'");
+        $query = $this->db->query("SELECT * FROM vote_sites WHERE vote_url LIKE ?", ["%$url%"]);
 
         if ($query->getNumRows()) {
             $result = $query->getResultArray();
@@ -223,7 +223,7 @@ class Vote_model extends CI_Model
             $sql .= " AND user_id = " . $this->db->escape($user_id);
         }
 
-        $query = $this->db->query($sql, array($vote_site_id, $time_back));
+        $query = $this->db->query($sql, [$vote_site_id, $time_back]);
 
         if ($query->getNumRows() > 0) {
             //Voted already

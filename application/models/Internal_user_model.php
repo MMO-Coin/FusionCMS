@@ -162,7 +162,7 @@ class Internal_user_model extends CI_Model
 
     public function getAccessId($rankId)
     {
-        $query = $this->db->query("SELECT access_id FROM ranks WHERE id = ?", array($rankId));
+        $query = $this->db->query("SELECT access_id FROM ranks WHERE id = ?", [$rankId]);
         if ($query->getNumRows() > 0) {
             $result = $query->getResultArray();
             return $result[0]['access_id'];
@@ -173,7 +173,7 @@ class Internal_user_model extends CI_Model
 
     public function getIdByNickname($nickname)
     {
-        $query = $this->db->query("SELECT id FROM account_data WHERE nickname = ?", array($nickname));
+        $query = $this->db->query("SELECT id FROM account_data WHERE nickname = ?", [$nickname]);
 
         if ($query->getNumRows() > 0) {
             $result = $query->getResultArray();
@@ -213,10 +213,9 @@ class Internal_user_model extends CI_Model
     {
         $avatarId = !$id ? $this->avatarId : $this->getAvatarId($id);
 
-        $query = $this->db->query("SELECT avatar FROM avatars WHERE id = ?", array($avatarId));
+        $query = $this->db->query("SELECT avatar FROM avatars WHERE id = ?", [$avatarId]);
 
-        if($query->getNumRows() > 0)
-        {
+        if ($query->getNumRows() > 0) {
             $result = $query->getResultArray();
 
             return $result[0]['avatar'];
@@ -225,22 +224,20 @@ class Internal_user_model extends CI_Model
         return false;
     }
 
-	public function getAvatarId($id = false)
+    public function getAvatarId($id = false)
     {
-		if(!$id)
-        {
-			return $this->avatarId;
-		} else {
-			$query = $this->db->query("SELECT avatar FROM account_data WHERE id = ?", array($id));
+        if (!$id) {
+            return $this->avatarId;
+        } else {
+            $query = $this->db->query("SELECT avatar FROM account_data WHERE id = ?", [$id]);
 
-			if($query->getNumRows() > 0)
-            {
-				$result = $query->getResultArray();
+            if ($query->getNumRows() > 0) {
+                $result = $query->getResultArray();
 
-				return $result[0]['avatar'];
-			}
-		}
-	}
+                return $result[0]['avatar'];
+            }
+        }
+    }
 
     /*
     | -------------------------------------------------------------------
@@ -249,26 +246,26 @@ class Internal_user_model extends CI_Model
     */
     public function setVp($userId, $vp)
     {
-        $this->db->query("UPDATE account_data SET vp = ? WHERE id = ?", array($vp, $userId));
+        $this->db->query("UPDATE account_data SET vp = ? WHERE id = ?", [$vp, $userId]);
     }
 
     public function setLanguage($userId, $language)
     {
-        $this->db->query("UPDATE account_data SET language = ? WHERE id = ?", array($language, $userId));
+        $this->db->query("UPDATE account_data SET language = ? WHERE id = ?", [$language, $userId]);
     }
 
     public function setDp($userId, $dp)
     {
-        $this->db->query("UPDATE account_data SET dp = ? WHERE id = ?", array($dp, $userId));
+        $this->db->query("UPDATE account_data SET dp = ? WHERE id = ?", [$dp, $userId]);
     }
 
     public function setLocation($userId, $location)
     {
-        $this->db->query("UPDATE account_data SET location = ? WHERE id = ?", array($location, $userId));
+        $this->db->query("UPDATE account_data SET location = ? WHERE id = ?", [$location, $userId]);
     }
 
     public function setAvatar($userId, $avatarId)
     {
-        $this->db->query("UPDATE account_data SET avatar = ? WHERE id = ?", array($avatarId, $userId));
+        $this->db->query("UPDATE account_data SET avatar = ? WHERE id = ?", [$avatarId, $userId]);
     }
 }
