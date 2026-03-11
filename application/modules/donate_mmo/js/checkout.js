@@ -2,6 +2,8 @@ $(document).ready(function() {
     var solanaUrl = document.getElementById("solana-pay-url").value;
     var verifyUrl = document.getElementById("verification-url").value;
     
+    var expiresAt = parseInt(document.getElementById("expires-at").value, 10);
+    
     // Generate QR Code
     var qrContainer = document.getElementById("solana-qr-container");
     if(qrContainer && solanaUrl) {
@@ -15,8 +17,34 @@ $(document).ready(function() {
         });
     }
 
-    // Polling logic
+    // Timer logic
     var isPolling = true;
+    var timerInterval = setInterval(function() {
+        var now = Math.floor(Date.now() / 1000);
+        var distance = expiresAt - now;
+
+        if (distance <= 0) {
+            clearInterval(timerInterval);
+            document.getElementById("expiration-timer").innerHTML = "00:00";
+            
+            // visually expire
+            isPolling = false;
+            document.getElementById("payment-status").innerHTML = '<i class="fa fa-times-circle"></i> Invoice Expired. Please create a new one.';
+            document.getElementById("payment-status").style.color = 'red';
+            qrContainer.style.opacity = "0.2";
+            return;
+        }
+
+        var minutes = Math.floor(distance / 60);
+        var seconds = distance % 60;
+
+        minutes = minutes < 10 ? "0" + minutes : minutes;
+        seconds = seconds < 10 ? "0" + seconds : seconds;
+
+        document.getElementById("expiration-timer").innerHTML = minutes + ":" + seconds;
+    }, 1000);
+
+    // Polling logic
     var pollInterval = 4000; // 4 seconds
 
     function checkPaymentStatus() {

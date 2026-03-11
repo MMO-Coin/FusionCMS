@@ -75,7 +75,8 @@ class Donate_mmo extends MX_Controller
             'package' => $package,
             'reference' => $reference,
             'merchant' => $merchant,
-            'solana_pay_url' => $solana_pay_url
+            'solana_pay_url' => $solana_pay_url,
+            'expires_at' => time() + 3600 // 60 minutes from now
         ];
 
         $output = $this->template->loadPage("checkout.tpl", $data);
@@ -100,6 +101,13 @@ class Donate_mmo extends MX_Controller
         
         if(!$transaction) {
             echo json_encode(['status' => 'error', 'message' => 'Transaction not found or already processed']);
+            return;
+        }
+
+        // Check if invoice has expired (60 minutes)
+        if(time() - strtotime($transaction['created_at']) > 3600) {
+            $this->mmocoin_model->updateTransactionStatus($reference, 'failed');
+            echo json_encode(['status' => 'error', 'message' => 'Invoice has expired']);
             return;
         }
 
