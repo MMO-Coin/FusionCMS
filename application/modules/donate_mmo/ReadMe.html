@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MMOCoin Donation Module Documentation</title>
+    <style>
+        body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 800px; margin: 40px auto; padding: 0 20px; background: #f9f9f9; }
+        .container { background: white; padding: 40px; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
+        h1 { color: #2c3e50; border-bottom: 2px solid #3498db; padding-bottom: 10px; }
+        h2 { color: #2980b9; margin-top: 30px; }
+        h3 { color: #34495e; }
+        code { background: #f1f2f6; padding: 2px 6px; border-radius: 4px; font-family: Consolas, monospace; color: #e74c3c; }
+        .alert { background: #fff3cd; color: #856404; padding: 15px; border-left: 4px solid #ffeeba; margin: 20px 0; }
+        .code-block { background: #2c3e50; color: #ecf0f1; padding: 15px; border-radius: 5px; font-family: monospace; overflow-x: auto; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h1>MMOCoin Donation Module</h1>
+    <p>This is a <strong>standalone, decentralized payment gateway</strong> module for FusionCMS that allows you to accept MMOCoin without interacting with third-party custodial services.</p>
+    <p>It utilizes the <strong>Solana Pay Standard</strong> to generate QR codes with unique reference keys, allowing your backend to automatically verify transactions directly from the Solana blockchain—without requiring users to connect their Web3 wallets to your website.</p>
+
+    <h2>Features</h2>
+    <ul>
+        <li><strong>Non-Custodial:</strong> Funds go directly to your designated Solana wallet.</li>
+        <li><strong>No Wallet Connection Needed:</strong> Protects users by simply offering a QR code they can scan from Phantom or Solflare on their phone or desktop.</li>
+        <li><strong>Admin Interface:</strong> Full CRUD operations for creating MMOCoin vs. Donation Point (DP) packages in your FusionCMS ACP.</li>
+        <li><strong>Auto-Verification:</strong> The checkout page polls the Solana RPC and instantly credits the user via AJAX once the transaction is signed on-chain.</li>
+    </ul>
+
+    <h2>Installation</h2>
+    <h3>Method 1: Via Admin Control Panel (Recommended)</h3>
+    <ol>
+        <li>Compress the <code>donate_mmo</code> folder into a <code>.zip</code> archive.</li>
+        <li>Go to your FusionCMS <strong>Admin Control Panel > Modules</strong>.</li>
+        <li>Upload the <code>.zip</code> file. FusionCMS will extract it, enable it, and run the included <code>install.sql</code> automatically to create the tables.</li>
+    </ol>
+
+    <h3>Method 2: Manual Installation</h3>
+    <ol>
+        <li>Drop the <code>donate_mmo</code> directory into <code>application/modules/</code>.</li>
+        <li>Run the SQL file located at <code>application/modules/donate_mmo/sql/install.sql</code> in your database manager (phpMyAdmin, etc).</li>
+        <li>Enable the module inside the FusionCMS ACP.</li>
+    </ol>
+
+    <h2>Configuration</h2>
+    <p>The core settings are located in: <code>application/modules/donate_mmo/config/donate_mmo.php</code></p>
+    
+    <div class="code-block">
+$config['merchant_wallet'] = 'YOUR_SOLANA_WALLET_ADDRESS';<br>
+$config['rpc_url'] = 'https://api.mainnet-beta.solana.com';<br>
+$config['mmo_coin_mint'] = '6QhZ6WQyYjLGDXFuc9CP1MzzvfeA6rDVnPYUke6ybuff';<br>
+$config['exchange_rate'] = 1;
+    </div>
+
+    <div class="alert">
+        <strong>⚠️ IMPORTANT RPC RECOMMENDATION:</strong><br><br>
+        By default, the module uses the public mainnet API. However, the public endpoints are heavily rate-limited and often fail or hang during checkout.<br><br>
+        It is highly recommended to sign up for a custom RPC endpoint to ensure fast and reliable verification. 
+        <strong>We strongly recommend using: <a href="https://helius.dev" target="_blank">helius.dev</a></strong>. <br><br>
+        <em>Note:</em> Helius offers a generous <strong>Free Account</strong> that provides more than enough monthly credits for medium-traffic servers, meaning <strong>this will work perfectly without needing a premium subscription!</strong> <br>
+        Just create a free account, copy your API URL, and paste it into the <code>$config['rpc_url']</code> field.
+    </div>
+
+    <h2>How It Works (Architecture)</h2>
+    
+    <h3>1. The Solana Pay Flow</h3>
+    <p>When a user clicks "Checkout", FusionCMS generates a unique 32-byte Base58 <strong>Reference Key</strong>. This acts as an invoice ID. The transaction is saved to the database as <code>pending</code>.</p>
+    <p>The frontend generates a QR code representing a standard Solana Pay URL: <br>
+    <code>solana:&lt;MERCHANT&gt;?amount=&lt;AMOUNT&gt;&amp;spl-token=&lt;MMO_MINT&gt;&amp;reference=&lt;KEY&gt;</code></p>
+
+    <h3>2. Scanning the QR Code & Verification</h3>
+    <p>Here is what happens on the user's end:</p>
+    <ol>
+        <li>The user opens a Solana wallet app on their phone (like <strong>Phantom</strong> or <strong>Solflare</strong>) and clicks the "Scan QR" button.</li>
+        <li>Once scanned, their wallet instantly reads the Solana Pay URL. It automatically fills in your Merchant address, the specific MMOCoin token contract, and the exact amount of MMOCoin required for the package.</li>
+        <li>Crucially, the wallet also hides the generated <strong>Reference Key</strong> silently in the transaction metadata.</li>
+        <li>The user hits "Confirm/Send" on their phone to broadcast this transaction to the Solana blockchain.</li>
+    </ol>
+    
+    <p>Behind the scenes, the FusionCMS checkout page is running a Javascript loop that pings your PHP backend every 4 seconds.</p>
+    <p>The PHP backend queries your RPC (Helius) for any signatures attached specifically to that Reference Key. The moment it finds a matching signature, it knows the transaction broadcasted successfully. It then marks the transaction as <code>completed</code> in the database and automatically credits the user's Donation Points.</p>
+</div>
+
+</body>
+</html>

@@ -1,0 +1,7 @@
+{
+    "name": "Donate MMOCoin",
+    "description": "Donation Gateway for MMOCoin using Solana Pay",
+    "author": "MMOCoin.pro",
+    "version": "1.0",
+    "enabled": true
+}
