@@ -23,6 +23,14 @@ if (PHP_SAPI === 'cli-server') {
     require BASEPATH . 'core/Security.php';
     $security = new CI_Security();
     $security->csrf_verify();
+    if (parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH) === '/response') {
+        require_once __DIR__ . '/../vendor/autoload.php';
+        require_once __DIR__ . '/../application/config/Services.php';
+        $response = App\Config\Services::response();
+        $response->removeHeader('Cache-Control');
+        $response->setStatusCode(200)->setBody('<!DOCTYPE html><html><body>' . str_repeat('Checkout response. ', 200) . '</body></html>')->send();
+        return;
+    }
     header('Content-Type: application/json');
     echo json_encode(['token' => $security->get_csrf_hash()]);
     return;
@@ -38,6 +46,7 @@ function request(string $url, ?array $post = null, string $cookie = ''): array {
     curl_setopt_array($handle, [
         CURLOPT_RETURNTRANSFER => true, CURLOPT_TIMEOUT => 5,
         CURLOPT_COOKIE => $cookie,
+        CURLOPT_HTTPHEADER => ['X-Request-Only: do-not-reflect', 'Authorization: Bearer test-only-token'],
         CURLOPT_HEADERFUNCTION => static function ($handle, $header) use (&$headers) {
             $headers[] = trim($header);
             return strlen($header);
@@ -45,7 +54,7 @@ function request(string $url, ?array $post = null, string $cookie = ''): array {
     ]);
     if ($post !== null) curl_setopt_array($handle, [CURLOPT_POST => true, CURLOPT_POSTFIELDS => http_build_query($post)]);
     $body = curl_exec($handle);
-    return [curl_getinfo($handle, CURLINFO_RESPONSE_CODE), json_decode((string) $body, true), $headers];
+    return [curl_getinfo($handle, CURLINFO_RESPONSE_CODE), json_decode((string) $body, true), $headers, (string) $body];
 }
 
 $socket = stream_socket_server('tcp://127.0.0.1:0', $error, $message);
@@ -82,6 +91,15 @@ try {
     [$status] = request('http://' . $address, ['csrf_token_name' => str_repeat('0', 32)], $cookie);
     check($status === 403, 'POST with the wrong CSRF nonce must fail.');
     echo "PASS: CSRF cookie flags, session HttpOnly, valid POST, rotation, missing and incorrect nonce\n";
+    [$status, , $headers, $html] = request('http://' . $address . '/response', ['csrf_token_name' => $next['token']], 'csrf_cookie_name=' . $next['token']);
+    check($status === 200 && strlen($html) > 3000 && str_ends_with($html, '</body></html>'), 'A form POST must return the complete HTML response.');
+    $contentType = '';
+    foreach ($headers as $header) {
+        if (stripos($header, 'Content-Type:') === 0) $contentType = $header;
+        check(!preg_match('/^(Cookie|Authorization|X-Request-Only|Origin|User-Agent):/i', $header), 'Request headers must not be reflected in the HTTP response.');
+    }
+    check(stripos($contentType, 'text/html') !== false, 'HTML responses must not inherit a form POST content type.');
+    echo "PASS: complete HTML POST response keeps its MIME type and does not reflect request headers\n";
 } finally {
     proc_terminate($process);
     proc_close($process);

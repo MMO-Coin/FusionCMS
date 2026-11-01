@@ -132,6 +132,14 @@ class Response extends Message implements ResponseInterface
         $this->noCache();
     }
 
+    /**
+     * Response headers must never be populated from the incoming request.
+     */
+    public function headers(): array
+    {
+        return $this->headers;
+    }
+
     //--------------------------------------------------------------------
 
 

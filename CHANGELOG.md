@@ -1,5 +1,10 @@
 # Changelog
 
+## Unreleased
+
+- Keep outgoing response headers separate from incoming request headers. A session could remove the response's last default header, causing form POST responses to copy the request's content type, length and credentials. Checkout now returns the full HTML page instead of downloading a truncated file.
+- Add regressions for empty response headers and a real CSRF-protected HTML POST with request-only headers.
+
 ## 9.5.1 - 2026-11-01
 
 This is the stable MMO-Coin fork release following `9.5.0-mmo.1`. The MMOCoin donation module is now version 1.1.1.

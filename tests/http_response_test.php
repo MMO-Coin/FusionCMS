@@ -14,6 +14,18 @@ namespace {
         throw new \RuntimeException('Controllers and the output pipeline must share the response.');
     }
     echo "PASS: response service shares controller status and supports explicit fresh instances\n";
+    $server = $_SERVER;
+    $_SERVER['CONTENT_TYPE'] = 'application/x-www-form-urlencoded';
+    $_SERVER['HTTP_CONTENT_LENGTH'] = '61';
+    $_SERVER['HTTP_COOKIE'] = 'session=test-only-cookie';
+    $_SERVER['HTTP_AUTHORIZATION'] = 'Bearer test-only-token';
+    $empty = new \CodeIgniter\HTTP\Response();
+    $empty->removeHeader('Cache-Control');
+    if ($empty->headers() !== [] || $empty->getHeaders() !== []) {
+        throw new \RuntimeException('An empty response imported incoming request headers.');
+    }
+    $_SERVER = $server;
+    echo "PASS: empty response headers do not import request content type, length or credentials\n";
     foreach ([[null, 200, 'HTTP/1.1 200 OK'], [null, 403, 'HTTP/1.1 403 Forbidden'], ['1.0', 200, 'HTTP/1.0 200 OK']] as [$version, $status, $expected]) {
         $GLOBALS['response_headers'] = [];
         $response = (new \ReflectionClass(\CodeIgniter\HTTP\Response::class))->newInstanceWithoutConstructor();
