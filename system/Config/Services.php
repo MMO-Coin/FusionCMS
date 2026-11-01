@@ -287,7 +287,7 @@ class Services extends BaseService
      *
      * @return ResponseInterface
      */
-    public static function response(bool $getShared = false)
+    public static function response(bool $getShared = true)
     {
         if ($getShared) {
             return static::getSharedInstance('response');

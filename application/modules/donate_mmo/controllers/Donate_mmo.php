@@ -27,6 +27,7 @@ class Donate_mmo extends MX_Controller
             'packages' => $this->mmocoin_model->getPackages(),
             'server_name' => $this->config->item('server_name'),
             'currency' => 'MMO',
+            'token_mint' => (string) $this->config->item('mmo_coin_mint'),
             'csrf_name' => $this->security->get_csrf_token_name(),
             'csrf_hash' => $this->security->get_csrf_hash(),
         ];
@@ -101,17 +102,16 @@ class Donate_mmo extends MX_Controller
     public function verify_payment($reference = '')
     {
         requirePermission('view');
-        header('Content-Type: application/json');
-        header('Cache-Control: no-store');
+        Services::response()->setHeader('Content-Type', 'application/json')->setHeader('Cache-Control', 'no-store');
         if (strtoupper($_SERVER['REQUEST_METHOD'] ?? '') !== 'POST') {
-            http_response_code(405);
+            Services::response()->setStatusCode(405);
             $this->paymentResponse(['status' => 'error', 'message' => 'Use POST to check payment status.']);
             return;
         }
         $userId = (int) $this->user->getId();
         $invoice = SolanaPaymentVerifier::validAddress((string) $reference) ? $this->mmocoin_model->getTransaction($reference, $userId) : false;
         if (!$invoice) {
-            http_response_code(404);
+            Services::response()->setStatusCode(404);
             $this->paymentResponse(['status' => 'error', 'message' => 'Invoice not found.']);
             return;
         }
@@ -127,7 +127,7 @@ class Donate_mmo extends MX_Controller
             return;
         }
         if (!Services::throttler()->check('donate_mmo_verify_' . $userId, 20, MINUTE)) {
-            http_response_code(429);
+            Services::response()->setStatusCode(429);
             $this->paymentResponse(['status' => 'pending']);
             return;
         }

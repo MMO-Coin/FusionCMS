@@ -1,6 +1,6 @@
 # Upgrading the MMO-Coin FusionCMS fork
 
-This guide covers the `9.5.0-mmo.1` release of [MMO-Coin/FusionCMS](https://github.com/MMO-Coin/FusionCMS). It includes upstream FusionCMS 9.5.0 changes and the MMOCoin donation module 1.1.0.
+This guide covers the `9.5.1` release of [MMO-Coin/FusionCMS](https://github.com/MMO-Coin/FusionCMS), including upgrades from the `9.5.0-mmo.1` preview. It includes upstream FusionCMS 9.5.0 changes and the MMOCoin donation module 1.1.1.
 
 ## Before you upgrade
 
@@ -10,6 +10,10 @@ This guide covers the `9.5.0-mmo.1` release of [MMO-Coin/FusionCMS](https://gith
 4. For the additional session-upload advisory, set `session.upload_progress.enabled=0` in the server's PHP configuration and restart PHP workers. This setting must apply before request parsing; setting it in application code is too late. See the [PHP security notices](https://www.php.net/archive/2026.php).
 
 The version check uses upstream PHP version numbers. It does not recognize distribution backports or detect Windows package rebuilds.
+
+PHP's cURL runtime must have a working CA trust store for the configured HTTPS RPC provider. Configure `curl.cainfo` when your PHP distribution does not provide one. Keep TLS certificate verification enabled.
+
+If upgrading from `9.5.0-mmo.1`, deploy the updated files and clear compiled templates. The donation schema has not changed since that preview. The request limiter creates `writable/cache/throttle`; PHP must be able to write there. Its limits are shared by workers using the same filesystem. Installations with multiple web nodes need shared storage for that directory to enforce one limit across nodes.
 
 ## Update an existing FusionCMS site
 
@@ -63,8 +67,8 @@ Keep the site paused and restore the matching **database and file backup** toget
 
 ## Validation for contributors
 
-The CI workflow targets PHP 8.3.36, 8.4.27 and 8.5.12, audits locked dependencies and runs the configuration, PHP requirement and donation regression tests. It uses a disposable MySQL database named `fusion_test` for schema and transaction checks.
+The CI workflow targets PHP 8.3.36, 8.4.27 and 8.5.12, audits locked dependencies and runs the configuration, PHP requirement, HTTP response, CSRF, rate limit and donation regression tests. It uses a disposable MySQL database named `fusion_test` for schema and transaction checks. Transaction fixtures replay recorded devnet responses without network access or signing keys.
 
 For local tests without MySQL, run `php tests/donation_security_test.php` with SQLite3 enabled. To include the MySQL-specific migrations, set `FUSION_TEST_MYSQL_HOST`, `FUSION_TEST_MYSQL_PORT` and `FUSION_TEST_MYSQL_PASSWORD` for a disposable server containing a database named `fusion_test`. The test drops and recreates its tables. Never point it at a database containing real site data.
 
-Automated fixtures do not replace a wallet-to-site test against your chosen RPC provider. See the release notes for the checks actually completed for this release.
+Automated fixtures do not replace a wallet-to-site test against your chosen RPC provider. The [2026-11-01 devnet report](docs/testing/solana-devnet-2026-11-01.md) records the browser and public-chain checks completed for this release.

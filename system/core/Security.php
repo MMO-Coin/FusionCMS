@@ -283,7 +283,8 @@ class CI_Security {
 					'path'     => config_item('cookie_path'),
 					'domain'   => config_item('cookie_domain'),
 					'secure'   => $secure_cookie,
-					'httponly' => config_item('cookie_httponly'),
+					// AJAX clients must read the CSRF nonce. Authentication cookies stay HttpOnly.
+					'httponly' => FALSE,
 					'samesite' => 'Strict'
 				)
 			);
@@ -297,7 +298,6 @@ class CI_Security {
 					.'; Path='.implode('/', array_map('rawurlencode', explode('/', config_item('cookie_path'))))
 					.($domain === '' ? '' : '; Domain='.$domain)
 					.($secure_cookie ? '; Secure' : '')
-					.(config_item('cookie_httponly') ? '; HttpOnly' : '')
 					.'; SameSite=Strict'
 			);
 		}

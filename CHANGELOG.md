@@ -1,5 +1,17 @@
 # Changelog
 
+## 9.5.1 - 2026-11-01
+
+This is the stable MMO-Coin fork release following `9.5.0-mmo.1`. The MMOCoin donation module is now version 1.1.1.
+
+- Fix the outgoing HTTP protocol version and share the response object so donation endpoints retain their JSON headers and `404`, `405` and `429` status codes.
+- Make the CSRF nonce readable by AJAX clients while keeping session cookies HttpOnly and CSRF cookies SameSite=Strict.
+- Register the missing request limiter with file locking across PHP workers. Keep two-factor limits separate for each account.
+- Add the donation module's missing English strings and show its configured token mint in the package instructions.
+- Add HTTP, CSRF and concurrent rate limit regressions, plus five recorded finalized devnet transaction responses.
+
+A browser checkout against public Solana devnet completed a 1.25 test-token payment and credited 25 DP once. Underpayment, wrong-token, wrong-recipient and failed transactions granted no points. Repeated verification, invoice ownership, expiry and CSRF rejection also passed. Only disposable wallets, valueless devnet SOL and a fresh test token were used. See the [test report](docs/testing/solana-devnet-2026-11-01.md) for transaction links and the scope of verification.
+
 ## 9.5.0-mmo.1 - 2026-11-01
 
 ### Security and compatibility

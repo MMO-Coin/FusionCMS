@@ -11,7 +11,12 @@ namespace MX {
 namespace App\Config {
     class Services
     {
-        public static function throttler() { return new class { public function check(...$arguments) { return true; } }; }
+        public static $response;
+        public static $allowRequest = true;
+        public static function response() {
+            return self::$response ??= (new \ReflectionClass(\CodeIgniter\HTTP\Response::class))->newInstanceWithoutConstructor();
+        }
+        public static function throttler() { return new class { public function check(...$arguments) { return Services::$allowRequest; } }; }
     }
 }
 namespace {
@@ -63,6 +68,7 @@ namespace {
         'underpayment' => ['pending', 0],
         'missing transaction' => ['pending', 0],
         'credit failed' => ['pending', 1],
+        'rate limited' => ['pending', 0],
     ];
     foreach ($cases as $name => [$expected, $completions]) {
         $current = $invoice;
@@ -91,12 +97,19 @@ namespace {
         if ($name === 'underpayment') $controller->rpcResult['getTransaction']['meta']['postTokenBalances'][0]['uiTokenAmount']['amount'] = '999999999';
         if ($name === 'missing transaction') $controller->rpcResult['getTransaction'] = null;
         $_SERVER['REQUEST_METHOD'] = $name === 'GET request' ? 'GET' : 'POST';
-        http_response_code(200);
+        \App\Config\Services::$allowRequest = $name !== 'rate limited';
+        \App\Config\Services::response()->setStatusCode(200);
         ob_start();
         $controller->verify_payment($reference);
         $response = json_decode(ob_get_clean(), true, 512, JSON_THROW_ON_ERROR);
         if ($response['status'] !== $expected || $model->completions !== $completions || $response['csrf_hash'] !== 'renewed-token') {
             throw new \RuntimeException("Controller failed: $name");
+        }
+        $expectedCode = ['GET request' => 405, 'foreign invoice' => 404, 'rate limited' => 429][$name] ?? 200;
+        if (\App\Config\Services::response()->getStatusCode() !== $expectedCode
+            || \App\Config\Services::response()->getHeaderLine('Content-Type') !== 'application/json'
+            || \App\Config\Services::response()->getHeaderLine('Cache-Control') !== 'no-store') {
+            throw new \RuntimeException("Incorrect HTTP response for: $name");
         }
         foreach ($controller->rpcCalls as [$method, $params]) {
             if ($params[1]['commitment'] !== 'finalized') throw new \RuntimeException('Finalized RPC commitment missing');

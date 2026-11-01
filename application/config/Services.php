@@ -19,6 +19,15 @@ use CodeIgniter\Config\BaseService;
  */
 class Services extends BaseService
 {
+    public static function throttler(bool $getShared = true): \CodeIgniter\Throttle\Throttler
+    {
+        if ($getShared) {
+            return static::getSharedInstance('throttler');
+        }
+
+        return new \CodeIgniter\Throttle\Throttler(WRITEPATH . 'cache/throttle');
+    }
+
     /*
      * public static function example($getShared = true)
      * {

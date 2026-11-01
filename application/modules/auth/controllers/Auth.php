@@ -264,7 +264,7 @@ class Auth extends MX_Controller
         if (!$this->input->is_ajax_request())
             exit('No direct script access allowed');
 
-        if (!Services::throttler()->check('totp_login', 5, MINUTE)) {
+        if (!Services::throttler()->check('totp_login_' . (int) Services::session()->get('uid'), 5, MINUTE)) {
             $data = [
                 'status' => false,
                 'icon' => 'error',

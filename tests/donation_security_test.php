@@ -43,6 +43,12 @@ namespace {
         exit;
     }
 
+    $recorded = json_decode(file_get_contents(__DIR__ . '/fixtures/solana_devnet_payments.json'), true, 512, JSON_THROW_ON_ERROR);
+    foreach ($recorded['payments'] as $payment) {
+        check(SolanaPaymentVerifier::verifies($payment['transaction'], $payment['invoice'], $payment['signature']) === $payment['expected'],
+            'Recorded finalized devnet transaction: ' . $payment['name']);
+    }
+
     $invoice = [
         'reference' => str_repeat('3', 32), 'merchant_wallet' => str_repeat('4', 32),
         'token_mint' => str_repeat('5', 32), 'mmo_amount' => '1.250000000',

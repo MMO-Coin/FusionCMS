@@ -31,7 +31,7 @@
             <li>Download the <a href="https://phantom.app/" target="_blank" style="color: #61dafb; text-decoration: underline;">Phantom Wallet</a> app on your phone or browser.</li>
             <li>Send some SOL (Solana) to your Phantom wallet to cover network fees.</li>
             <li>Use a decentralized exchange (like Raydium or Jupiter) to swap your SOL or USDC for MMOCoin token.
-                <br><small style="color: #999;">Contract Address: <code>6QhZ6WQyYjLGDXFuc9CP1MzzvfeA6rDVnPYUke6ybuff</code></small>
+                <br><small style="color: #999;">Token mint: <code>{$token_mint|escape}</code></small>
             </li>
             <li>Once you have MMOCoin in your wallet, return here, select a package, and click Checkout to scan the QR code!</li>
         </ol>

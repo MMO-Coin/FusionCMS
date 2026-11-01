@@ -67,6 +67,15 @@ jobs:
     - name: Run PHP requirement regression tests
       run: php tests/php_requirements_test.php
 
+    - name: Run HTTP response regression tests
+      run: php tests/http_response_test.php
+
+    - name: Run CSRF HTTP regression tests
+      run: php tests/security_csrf_test.php
+
+    - name: Run request throttling regression tests
+      run: php tests/throttler_test.php
+
     - name: Run donation security and schema regression tests
       env:
         FUSION_TEST_MYSQL_HOST: 127.0.0.1
