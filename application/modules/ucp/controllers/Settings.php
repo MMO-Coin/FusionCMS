@@ -108,8 +108,8 @@ class Settings extends MX_Controller
         if (strtoupper($currentPassword) === strtoupper($passwordHash["verifier"])) {
             $this->user->setPassword($newPassword);
 
-            // Invalidate all remember-me tokens on password change
-            $this->cms_model->deleteRememberMeTokenByAccount($this->user->getId());
+            // Revoke active sessions and remembered logins for every device.
+            $this->account_session_model->invalidate($this->user->getId());
 
             delete_cookie("fcms_username");
             delete_cookie("fcms_token");

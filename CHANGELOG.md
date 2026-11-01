@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Apply account-wide session revocation to password changes in account settings. Successful changes, including choosing the same password, revoke active sessions and remembered devices; rejected changes leave them usable. Add desktop and mobile coverage for stale checkout writes, old session IDs and tokens, account isolation, and fresh remembered login. This uses the existing session-revocation migration.
 - Invalidate all active PHP sessions after password recovery, including a reset to the same password. Check an account revocation version before authenticated requests, clear stale authentication and 2FA state, and prevent stale login or remember-me claims from receiving the new version. Existing sites must run `2026_11_01_01_account_session_versions.sql` before deploying these files.
 - Add desktop and mobile checks for active-session revocation, stale session-ID replay, rejected checkout writes, fresh login and isolation between accounts. Add session-version, overlapping-login, transaction rollback and migration regressions.
 - Rotate remember-me tokens with an atomic update to the existing row. Reject expired and reused tokens, clear invalid cookies, and revoke all remembered devices for the account on logout or password recovery. Retire legacy password-hash cookies; users with that old format must sign in again. No schema migration is needed.
