@@ -15,7 +15,7 @@ const Read = {
                 $(this).html('<a class="nice_button" href="' + Config.URL + 'messages">&larr; ' + lang("inbox", "messages") + '</a>').fadeIn(300);
             });
 
-            $("#pm_spot_ajax").html('<div style="text-align:right;margin-bottom:10px;"><img src="' + Config.image_path + 'ajax.gif" /></div>');
+            $("#pm_spot_ajax").html('<div style="text-align:right;margin-bottom:10px;"><i class=\"fa-duotone fa-spinner-third fa-spin\"></i></div>');
 
             $.post(Config.URL + "messages/read/reply/" + id, {
                 content: content,

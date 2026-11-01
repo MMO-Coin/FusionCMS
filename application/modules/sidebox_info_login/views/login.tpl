@@ -14,18 +14,42 @@
 
         <div class="captcha-field {if !$use_captcha}d-none{/if}">
             <div class="input-group mt-3">
-                <label for="floatingCaptcha" class="input-group-text w-100 rounded-0 rounded-top text-center d-block" id="captcha">
-                    <img src="{$url}auth/getCaptcha?{time()}" alt="captcha" width="150" height="30" id="captchaImage">
-                </label>
+                {if $captcha_type == 'image_captcha'}
+                    <label for="floatingCaptcha" class="input-group-text w-100 rounded-0 rounded-top text-center d-block" id="captcha">
+                        <img src="{$url}auth/getCaptcha?{time()}" alt="captcha" width="150" height="30" id="captchaImage">
+                    </label>
 
-                <span class="input-group-text cursor-pointer ms-0 rounded-0 rounded-bottom-start" id="captcha" style="width:40px;" data-captcha-id="captchaImage" onClick="SideAuth.refreshCaptcha(this);">
-                    <i class="fa-duotone fa-rotate"></i>
-                </span>
+                    <span class="input-group-text cursor-pointer ms-0 rounded-0 rounded-bottom-start" id="captcha" style="width:40px;" data-captcha-id="captchaImage" onClick="SideAuth.refreshCaptcha(this);">
+                        <i class="fa-duotone fa-rotate"></i>
+                    </span>
 
-                <div class="form-floating ms-0 flex-grow-1">
-                    <input type="text" class="form-control side-captcha-input border-0 rounded-0 rounded-bottom-end" id="floatingCaptcha" placeholder="{lang('login_label_captcha', 'sidebox_info_login')}" aria-describedby="captcha">
-                    <label for="floatingCaptcha">{lang("login_label_captcha", "sidebox_info_login")}</label>
-                </div>
+                    <div class="form-floating ms-0 flex-grow-1">
+                        <input type="text" class="form-control side-captcha-input border-0 rounded-0 rounded-bottom-end" id="floatingCaptcha" placeholder="{lang('login_label_captcha', 'sidebox_info_login')}" aria-describedby="captcha">
+                        <label for="floatingCaptcha">{lang("login_label_captcha", "sidebox_info_login")}</label>
+                    </div>
+                {elseif $captcha_type == 'recaptcha' || $captcha_type == 'recaptcha3'}
+                    <div class="captcha">
+                        {$recaptcha_html}
+                    </div>
+                {elseif $captcha_type == 'fusion_captcha'}
+                    <script type="text/javascript" src="{$url}application/js/captcha/cap_widget.min.js"></script>
+                    <cap-widget
+                            data-cap-api-endpoint="/captcha/"
+                            data-cap-hidden-field-name="side-cap-token"
+                            data-cap-background="#1e1e1e"
+                            data-cap-color="#f0f0f0"
+                            data-cap-direction="{if $isRTL}rtl{else}ltr{/if}"
+                            data-cap-i18n-initial-state="{lang('initial_state', 'captcha')}"
+                            data-cap-i18n-verifying-label="{lang('verifying_label', 'captcha')}"
+                            data-cap-i18n-solved-label="{lang('solved_label', 'captcha')}"
+                            data-cap-i18n-error-label="{lang('error_label', 'captcha')}"
+                            data-cap-i18n-wasm-disabled="{lang('wasm_disabled', 'captcha')}"
+                            data-cap-i18n-verify-aria-label="{lang('verify_aria_label', 'captcha')}"
+                            data-cap-i18n-verifying-aria-label="{lang('verifying_aria_label', 'captcha')}"
+                            data-cap-i18n-verified-aria-label="{lang('verified_aria_label', 'captcha')}"
+                            data-cap-i18n-error-aria-label="{lang('error_aria_label', 'captcha')}">
+                    </cap-widget>
+                {/if}
             </div>
         </div>
 
@@ -49,89 +73,117 @@
 </form>
 
 <script>
-var SideAuth = {
-	timeout: null,
-	useCaptcha: false,
+    const SideAuth = {
+        timeout: null,
+        useCaptcha: {if $captcha_type == 'image_captcha'}true{else}false{/if},
+        useRecaptcha: {if $captcha_type == 'recaptcha'}true{else}false{/if},
+        useRecaptcha3: {if $captcha_type == 'recaptcha3'}true{else}false{/if},
+        useFusionCaptcha: {if $captcha_type == 'fusion_captcha'}true{else}false{/if},
 
-	login: function(submit = false) {
-		var postData = {
-			"username": $(".side-username-input").val(),
-			"password": $(".side-password-input").val(),
-			"remember": $(".side-remember-check").is(":checked"),
-			"captcha": $(".side-captcha-input").val(),
-			"submit": submit,
-			"csrf_token_name": Config.CSRF,
-			"token": Config.CSRF
-		};
+        login: function (submit = false) {
+            const postData = {
+                "username": $(".side-username-input").val(),
+                "password": $(".side-password-input").val(),
+                "remember": $(".side-remember-check").is(":checked"),
+                "captcha": $(".side-captcha-input").val(),
+                "submit": submit,
+                "csrf_token_name": Config.CSRF,
+                "token": Config.CSRF
+            };
 
-		var fields = [
-			"username", "password"
-		];
+            const fields = [
+                "username", "password"
+            ];
 
-		if(SideAuth.useCaptcha) {
-			fields.push("captcha");
-		}
+            if (SideAuth.useCaptcha) {
+                fields.push("captcha");
+            }
 
-		console.log("fields", fields);
+            if (SideAuth.useRecaptcha) {
+                postData["recaptcha"] = grecaptcha.getResponse();
+            }
 
-		clearTimeout (SideAuth.timeout);
-		SideAuth.timeout = setTimeout (function()
-		{
-			$.post(Config.URL + "auth/checkLogin", postData, function(data) {
-				try {
-					data = JSON.parse(data);
-					console.log(data);
+            if (SideAuth.useRecaptcha3) {
+                postData["recaptcha"] = $(".g-recaptcha-response").val();
+            }
 
-					if(data["redirect"] === true) {
-						window.location.href = Config.URL + "ucp";
-						return;
-					}
+            if (SideAuth.useFusionCaptcha) {
+                postData["cap-token"] = $('input[name="side-cap-token"]').val();
+            }
 
-					if(data["showCaptcha"] === true) {
-						$(".captcha-field").removeClass("d-none");
-					}
+            clearTimeout(SideAuth.timeout);
+            SideAuth.timeout = setTimeout(function () {
+                $.post(Config.URL + "auth/checkLogin", postData, function (data) {
+                    try {
+                        data = JSON.parse(data);
 
-					for(var i = 0; i<fields.length;i++)
-                    {
-						if(data["messages"]["error"] != "")
-                        {
-							$(".side-username-input, .side-password-input, .captcha-input").parents(".input-group").addClass("border border-danger");
-							$(".side-username-input, .side-password-input, .captcha-input").addClass("is-invalid");
-							$(".side-error-feedback").addClass("invalid-feedback d-block").removeClass("d-none").html(data["messages"]["error"]);
-						}
-					}
-				} catch(e) {
-					console.error(e);
-					console.log(data);
-				}				
-			});
+                        if (data["redirect"] === true) {
+                            window.location.href = Config.URL + "ucp";
+                            return;
+                        }
 
-			console.log(postData);
+                        if (data["showCaptcha"] === true) {
+                            $(".captcha-field").removeClass("d-none");
+                        }
 
-		}, 500);
-	},
+                        if (SideAuth.useFusionCaptcha && data.captcha_error === true) {
+                            SideAuth.resetFusionCaptcha();
+                        }
 
-	showPassword: function(ele) {
-		if($(ele).data("show") == true) {
-			$(ele).html('<i class="fa-duotone fa-eye-slash"></i>');
-			$(ele).data("show", false);
+                        if (SideAuth.useRecaptcha3)
+                            setCaptchaToken();
 
-			$("input#"+ $(ele).data("input-id")).attr("type", "password");
-		} else if($(ele).data("show") == false) {
-			$(ele).html('<i class="fa-duotone fa-eye"></i>');
-			$(ele).data("show", true);
-			
-			$("input#"+ $(ele).data("input-id")).attr("type", "text");
-		}
-		
-	},
+                        for (var i = 0; i < fields.length; i++) {
+                            if (data["messages"]["error"] != "") {
+                                $(".side-username-input, .side-password-input, .captcha-input").parents(".input-group").addClass("border border-danger");
+                                $(".side-username-input, .side-password-input, .captcha-input").addClass("is-invalid");
+                                $(".side-error-feedback").addClass("invalid-feedback d-block").removeClass("d-none").html(data["messages"]["error"]);
+                            }
+                        }
+                    } catch (e) {
+                        console.error(e);
+                        console.log(data);
+                    }
+                });
 
-	refreshCaptcha: function(ele) {
-		$(".side-captcha-input").val('');
-		$(".side-captcha-input").focus();
-		var captchaID = $(ele).data("captcha-id");
-		var imgField = $("img#"+ captchaID);
-		imgField.attr("src", imgField.attr("src") +"&d="+ new Date().getTime());
-	}
-};
+                console.log(postData);
+
+            }, 500);
+        },
+
+        showPassword: function (ele) {
+            if ($(ele).data("show") == true) {
+                $(ele).html('<i class="fa-duotone fa-eye-slash"></i>');
+                $(ele).data("show", false);
+
+                $("input#" + $(ele).data("input-id")).attr("type", "password");
+            } else if ($(ele).data("show") == false) {
+                $(ele).html('<i class="fa-duotone fa-eye"></i>');
+                $(ele).data("show", true);
+
+                $("input#" + $(ele).data("input-id")).attr("type", "text");
+            }
+
+        },
+
+        refreshCaptcha: function (ele) {
+            $(".side-captcha-input").val('');
+            $(".side-captcha-input").focus();
+            var captchaID = $(ele).data("captcha-id");
+            var imgField = $("img#" + captchaID);
+            imgField.attr("src", imgField.attr("src") + "&d=" + new Date().getTime());
+        },
+
+        resetFusionCaptcha: function () {
+            $('input[name="side-cap-token"]').val('');
+
+            const widget = document.querySelector('cap-widget');
+            if (widget && typeof widget.reset === 'function') {
+                widget.reset();
+                widget.removeAttribute('disabled');
+            } else {
+                console.warn('Fusion captcha widget not found. Please ensure it is in the DOM.');
+            }
+        }
+    };
 </script>

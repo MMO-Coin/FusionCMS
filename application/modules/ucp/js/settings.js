@@ -1,83 +1,79 @@
-
-/**
- * @package FusionCMS
- * @version 6.X
- * @author Jesper Lindström
- * @author Xavier Geernick
- * @link http://fusion-hub.com
- */
-
 var Settings = {
 
 	wrongPassword: null,
 	canSubmit: true,
 
-	submit: function()
-	{
-		// Client-side validation of the passwords
-		if($("#new_password").val() !== $("#new_password_confirm").val())
+	submit: function() {
+		// Client-side check new password and confirmation must match
+		if ($("#new_password").val() !== $("#new_password_confirm").val())
 		{
-			if(Settings.canSubmit)
-			{
+			if (Settings.canSubmit) {
 				Swal.fire({
 					text: lang("pw_doesnt_match", "ucp"),
 					icon: 'error'
 				});
-				
 				Settings.canSubmit = false;
 			}
+			return;
 		}
-		else if(Settings.wrongPassword != null && Settings.wrongPassword == $("#old_password").val())
+
+		if (Settings.wrongPassword != null && Settings.wrongPassword == $("#old_password").val())
 		{
 			return false;
 		}
-		else
-		{
-			Settings.canSubmit = true;
 
-			// Show that we're loading something
-			$("#settings_ajax").html('<div class="spinner-border text-primary" role="status"><span class="visually-hidden">Loading...</span></div>');
+		// Show that we're loading something
+		Settings.canSubmit = true;
+		$("#settings_ajax").html('<div class="spinner-border text-primary" role="status"><span class="visually-hidden">Loading...</span></div>');
 
-			// Gather the values
-			var values = {
-				old_password: $("#old_password").val(),
-				new_password: $("#new_password").val(),
-				csrf_token_name: Config.CSRF
-			};
+		// Gather the values
+		var values = {
+			old_password: $("#old_password").val(),
+			new_password: $("#new_password").val(),
+			csrf_token_name: Config.CSRF
+		};
 
-			// Submit the request
-			$.post(Config.URL + "ucp/settings/submit", values, function(data)
-			{
-				$("#settings_ajax").html('');
-				
-				if(/yes/.test(data))
-				{
-					Swal.fire({
-						text: lang("changes_saved", "ucp"),
-						icon: 'success',
-						willClose: () => {
-							window.location.reload(true);
-						}
-					});
-				}
-				else if(/no/.test(data))
-				{
-					Swal.fire({
-						text: lang("invalid_pw", "ucp"),
-						icon: 'error'
-					});
+		// Submit the request
+		$.post(Config.URL + "ucp/settings/submit", values, function(data) {
+			// Clear spinner
+			$("#settings_ajax").html('');
 
+			// Parse the JSON response (jQuery automatically parses if server sends correct Content-Type,
+			// but we can force dataType: 'json' in the $.post settings for safety)
+			if (data.status === 'success') {
+				Swal.fire({
+					html: data.message || lang("changes_saved", "ucp"),
+					icon: 'success',
+					willClose: () => {
+						window.location = Config.URL + "login";
+					}
+				});
+			} else if (data.status === 'error') {
+				// Handle error based on its code
+				if (data.message === lang("invalid_pw", "ucp")) {
+					// Store the wrong value to avoid repeated attempts
 					Settings.wrongPassword = $("#old_password").val();
 				}
-				else
-				{
-					Swal.fire({
-						text: data,
-						icon: 'error',
-					});
-				}
+
+				Swal.fire({
+					html: data.message || lang("invalid_pw", "ucp"),
+					icon: 'error'
+				});
+			} else {
+				// Fallback for unexpected responses
+				Swal.fire({
+					html: data.message || data,
+					icon: 'error'
+				});
+			}
+		}, 'json').fail(function(jqXHR, textStatus, errorThrown) {
+			// Handle network/server errors
+			$("#settings_ajax").html('');
+			Swal.fire({
+				html: 'Request failed: ' + textStatus,
+				icon: 'error'
 			});
-		}
+		});
 	},
 
 	submitInfo: function()

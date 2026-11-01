@@ -72,13 +72,15 @@ class Vote_model extends CI_Model
      */
     public function getVoteSiteByUrl($url)
     {
-        $query = $this->db->query("SELECT * FROM vote_sites WHERE vote_url LIKE ?", ["%$url%"]);
+        $query = $this->db->table('vote_sites')
+            ->like('vote_url', $url, 'both')
+            ->get();
 
         if ($query->getNumRows()) {
             return $query->getRowArray();
-        } else {
-            return false;
         }
+
+        return false;
     }
 
     public function getVoteLog($vote_site_id, $user_ip, $time_back, $ipLock = false)
@@ -149,12 +151,47 @@ class Vote_model extends CI_Model
         $insert = $this->db->table('vote_log')->insert($data);
 
         if ($insert) {
-            $this->db->query("UPDATE account_data SET total_votes = total_votes + 1 WHERE id = ?", [$this->user->getId()]);
+            $this->db->query("UPDATE account_data SET total_votes = total_votes + 1 WHERE id = ?", [$user_id]);
 
             //Return true if we voted
             return true;
         } else {
             return false;
+        }
+    }
+
+    public function atomicVote($userId, $userIp, $voteSiteId, $pointsPerVote)
+    {
+        $lockName = "vote_{$userId}_{$voteSiteId}";
+
+        $lock = $this->db->query("SELECT GET_LOCK(?, 5) AS lck", [$lockName])->getRowArray();
+
+        if (!$lock || (int)$lock['lck'] !== 1) {
+            return false;
+        }
+
+        try {
+            $this->db->transBegin();
+
+            if (!$this->canVote($voteSiteId, $userId, $userIp)) {
+                $this->db->transRollback();
+                return false;
+            }
+
+            $this->vote_log($userId, $userIp, $voteSiteId);
+
+            $this->updateVp($userId, $pointsPerVote);
+
+            if (!$this->db->transStatus()) {
+                $this->db->transRollback();
+                return false;
+            }
+
+            $this->db->transCommit();
+
+            return true;
+        } finally {
+            $this->db->query("DO RELEASE_LOCK(?)", [$lockName]);
         }
     }
 

@@ -27,3 +27,4 @@ $lang['no_camamand'] = "El reino no admite ese servicio." ;
 $lang['dont_enough_Donation_Points'] = "No tienes suficientes puntos de donación." ;
 $lang['no_service'] = "El servicio seleccionado no es válido.";
 $lang['no_selected_service'] = "Algo salió mal, inténtelo de nuevo." ;
+$lang['successfully']  = "La solicitud se realizó con éxito." ;

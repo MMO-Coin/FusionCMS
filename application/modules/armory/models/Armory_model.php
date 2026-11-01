@@ -7,7 +7,7 @@ class Armory_model extends CI_Model
     private BaseConnection $c_connection;
     private BaseConnection $w_connection;
 
-    public function get_items($searchString, $limit, $offset, $realmId = 1)
+    public function get_items(string $searchString, int $limit, int $offset, int $realmId = 1)
     {
         //Connect to the world database
         $realm = $this->realms->getRealm($realmId);
@@ -30,7 +30,7 @@ class Armory_model extends CI_Model
         }
     }
 
-    public function get_items_count($string, $realmId)
+    public function get_items_count(string $string, int $realmId)
     {
         $realm = $this->realms->getRealm($realmId);
 
@@ -45,7 +45,7 @@ class Armory_model extends CI_Model
         return $this->w_connection->table(table("item_template", $realmId))->like(column("item_template", "name", false, $realmId), $string)->countAllResults();
     }
 
-    public function get_guilds($searchString, $limit, $offset, $realmId = 1)
+    public function get_guilds(string $searchString, int $limit, int $offset, int $realmId = 1)
     {
         //Connect to the character database
         $realm = $this->realms->getRealm($realmId);
@@ -63,7 +63,7 @@ class Armory_model extends CI_Model
         }
     }
 
-    public function get_guilds_count($string, $realmId)
+    public function get_guilds_count(string $string, int $realmId)
     {
         $realm = $this->realms->getRealm($realmId);
 
@@ -74,7 +74,7 @@ class Armory_model extends CI_Model
         return $this->c_connection->table(table("guild", $realmId))->like(column("guild", "name", false, $realmId), $string)->countAllResults();
     }
 
-    public function get_characters($searchString, $limit, $offset, $realmId = 1)
+    public function get_characters(string $searchString, int $limit, int $offset, int $realmId = 1)
     {
         $realm = $this->realms->getRealm($realmId);
 
@@ -94,7 +94,7 @@ class Armory_model extends CI_Model
         }
     }
 
-    public function get_characters_count($string, $realmId)
+    public function get_characters_count(string $string, int $realmId)
     {
         $realm = $this->realms->getRealm($realmId);
 

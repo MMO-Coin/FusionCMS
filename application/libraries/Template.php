@@ -512,6 +512,7 @@ class Template
         $data['writable_path'] = array_key_exists("writable_path", $data) ? $data['writable_path'] : $this->writable_path;
         $data['CI'] = array_key_exists("CI", $data) ? $data['CI'] : $this->CI;
         $data['ucp_menus'] = array_key_exists("ucp_menus", $data) ? $data['ucp_menus'] : $this->getUcpMenu();
+        $data['title'] = array_key_exists("title", $data) ? $data['title'] : substr($this->title, 0, -3);
 
         // Should we load from the default views or not?
         if ($data['module'] == "default") {

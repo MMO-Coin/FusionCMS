@@ -29,7 +29,7 @@ const Create = {
         } else {
             const spot = $("#pm_spot");
 
-            spot.html('<div style="text-align:center;padding:10px;"><img src="' + Config.image_path + 'ajax.gif" /></div>');
+            spot.html('<div style="text-align:center;padding:10px;"><i class=\"fa-duotone fa-spinner-third fa-spin\"></i></div>');
 
             $.post(Config.URL + "messages/create/submit/" + username, {
                 title: title,

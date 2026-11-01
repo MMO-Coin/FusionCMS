@@ -68,11 +68,7 @@ class Items
                 ];
 
                 if (!is_array($cacheData['icon'])) {
-                    // make sure It's not in DB already
-                    $result = $this->CI->db->query("SELECT COUNT(*) as count FROM item_template WHERE entry = ?", [$item])->getRow();
-                    if ($result->count == 0) {
-                        $this->CI->db->table('item_template')->insert($cacheData);
-                    }
+                    $this->CI->db->table('item_template')->ignore(true)->insert($cacheData);
 
                     // save to cache
                     if ($enableCache)
@@ -212,7 +208,7 @@ class Items
             }
 
             $data = [
-                'item' => $this->parseItemData($row),
+                'item' => $this->parseItemData($row, $realmObj),
                 'icon' => $row['icon'],
                 'api_item_icons' => $this->CI->config->item('api_item_icons')
             ];
@@ -234,7 +230,7 @@ class Items
     /**
      * Gather all data item needed
      */
-    private function parseItemData($itemDB)
+    private function parseItemData($itemDB, $realmObj)
     {
         // No item was found
         if (!$itemDB || $itemDB == "empty") {
@@ -259,7 +255,7 @@ class Items
             'durability'     => $itemDB['MaxDurability'] ?? null,
             'armor'          => array_key_exists('armor', $itemDB) ? $itemDB['armor'] : false,
             'required'       => $itemDB['RequiredLevel'] ?? null,
-            'AllowableClass' => $this->getAllowedClasses($itemDB),
+            'AllowableClass' => $this->getAllowedClasses($itemDB, $realmObj),
             'level'          => $itemDB['ItemLevel'] ?? null,
             'type'           => $this->getType($itemDB['class'], $itemDB['subclass']),
             'damage_type'    => array_key_exists("dmg_type1", $itemDB) ? $damages[$itemDB['dmg_type1']] : false,
@@ -286,9 +282,9 @@ class Items
         return $name;
     }
 
-    private function getAllowedClasses($itemDB): ?array
+    private function getAllowedClasses($itemDB, $realmObj): ?array
     {
-        return $itemDB['AllowableClass'] > 0 ? $this->getClassesFromMask($itemDB['AllowableClass'], $this->CI->config->item('classes_en')) : null;
+        return $itemDB['AllowableClass'] > 0 ? $this->getClassesFromMask($itemDB['AllowableClass'], array_intersect_key($this->CI->config->item('classes_en'), array_flip($realmObj->getExpansionClasses()))) : null;
     }
 
     private function calculateSpeed($delay): int|string
@@ -470,22 +466,17 @@ class Items
 
         if ($cache !== false) {
             return $cache;
-        } else {
-            $query = CI::$APP->db->query("SELECT spellText FROM spelltext_en WHERE spellId = ? LIMIT 1", [$id]);
+        }
 
-            // Check for results
-            if ($query->getNumRows() > 0) {
-                $row = $query->getResultArray();
+        $row = CI::$APP->db->table('spelltext_en')->select('spellText')->where('spellId', $id)->get()->getRow();
 
-                $data = $row[0]['spellText'];
-            } else {
-                $data = false;
-            }
+        // Check for results
+        $data = $row?->spellText ?? false;
 
+        if ($data)
             CI::$APP->cache->save("spells/spell_" . $id, $data);
 
-            return $data;
-        }
+        return $data;
     }
 
     /**

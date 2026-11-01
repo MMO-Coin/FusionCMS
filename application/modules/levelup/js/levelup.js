@@ -111,7 +111,7 @@ const LevelUp = {
                 if (result.isConfirmed) {
                     // Mark as busy
                     LevelUp.busy = true;
-                    LevelUp.DisplayMessage(lang('processing', 'levelup') + '<br><img src="' + Config.image_path + 'ajax.gif" />');
+                    LevelUp.DisplayMessage(lang('processing', 'levelup') + '<br><i class=\"fa-duotone fa-spinner-third fa-spin\"></i>');
 
                     // Post the data
                     $.post(Config.URL + "levelup/submit", {

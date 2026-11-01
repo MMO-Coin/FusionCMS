@@ -298,6 +298,7 @@ class Administrator
             "avatar" => $this->user->getAvatar($this->user->getId()),
             "groups" => $this->acl_model->getGroupsByUser(),
             "notifications" => $notifications,
+            "isRTL" => $this->language->getLanguage() == 'persian' || $this->language->getClientData() == 'persian',
             "cdn_link" => $this->config->item('cdn') === true ? $this->config->item('cdn_link') : null
         ];
 
@@ -395,6 +396,7 @@ class Administrator
                         "isOnline" => $this->user->isOnline(),
                         "username" => $this->user->getUsername(),
                         "avatar" => $this->user->getAvatar($this->user->getId()),
+                        "isRTL" => $this->language->getLanguage() == 'persian' || $this->language->getClientData() == 'persian',
                         "cdn_link" => $this->config->item('cdn') === true ? $this->config->item('cdn_link') : null
                     ];
 

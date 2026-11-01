@@ -10,7 +10,7 @@
 
             <div class="captcha-field {if !$use_captcha}d-none{/if}">
                 <div class="input-group mt-3 mb-3">
-                    {if $captcha_type == 'inbuilt'}
+                    {if $captcha_type == 'image_captcha'}
                         <label for="floatingCaptcha" class="input-group-text w-100 rounded-0 rounded-top text-center d-block" id="captcha">
                             <img src="{$url}auth/getCaptcha?{time()}" alt="captcha" width="150" height="30" id="captchaImage">
                         </label>
@@ -27,6 +27,24 @@
                         <div class="captcha">
                             {$recaptcha_html}
                         </div>
+                    {elseif $captcha_type == 'fusion_captcha'}
+                        <script type="text/javascript" src="{$url}application/js/captcha/cap_widget.min.js"></script>
+                        <cap-widget
+                                data-cap-api-endpoint="/captcha/"
+                                data-cap-hidden-field-name="cap-token"
+                                data-cap-background="#1e1e1e"
+                                data-cap-color="#f0f0f0"
+                                data-cap-direction="{if $isRTL}rtl{else}ltr{/if}"
+                                data-cap-i18n-initial-state="{lang('initial_state', 'captcha')}"
+                                data-cap-i18n-verifying-label="{lang('verifying_label', 'captcha')}"
+                                data-cap-i18n-solved-label="{lang('solved_label', 'captcha')}"
+                                data-cap-i18n-error-label="{lang('error_label', 'captcha')}"
+                                data-cap-i18n-wasm-disabled="{lang('wasm_disabled', 'captcha')}"
+                                data-cap-i18n-verify-aria-label="{lang('verify_aria_label', 'captcha')}"
+                                data-cap-i18n-verifying-aria-label="{lang('verifying_aria_label', 'captcha')}"
+                                data-cap-i18n-verified-aria-label="{lang('verified_aria_label', 'captcha')}"
+                                data-cap-i18n-error-aria-label="{lang('error_aria_label', 'captcha')}">
+                        </cap-widget>
                     {/if}
                 </div>
             </div>
@@ -37,7 +55,7 @@
 </div>
 
 {if $use_captcha}
-    {if $captcha_type == 'inbuilt'}
+    {if $captcha_type == 'image_captcha'}
         <script>
             $(window).on("load", function() {
                 Recovery.useCaptcha = true;
@@ -53,6 +71,12 @@
         <script>
             $(window).on("load", function() {
                 Recovery.useRecaptcha3 = true;
+            });
+        </script>
+    {elseif $captcha_type == 'fusion_captcha'}
+        <script>
+            $(window).on("load", function() {
+                Recovery.useFusionCaptcha = true;
             });
         </script>
     {/if}

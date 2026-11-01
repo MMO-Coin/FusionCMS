@@ -20,6 +20,7 @@ class Auth extends MX_Controller
         $this->load->library('form_validation');
         $this->load->library('captcha');
         $this->load->library('recaptcha');
+        $this->load->library('FusionCaptcha');
         $this->load->library('GoogleAuthenticator');
         $this->load->model('login_model');
 
@@ -85,9 +86,10 @@ class Auth extends MX_Controller
         $show_captcha = $use_captcha == true || (int) Services::session()->get('attempts') >= $this->config->item('captcha_attemps');
 
         $this->form_validation->set_rules('username', 'username', 'trim|required|min_length[4]|max_length[24]|alpha_numeric');
-        $this->form_validation->set_rules('password', 'password', 'trim|required|min_length[6]');
+        $this->form_validation->set_rules('password', 'password', 'trim|required|min_length[6]|max_length[16]');
 
-        if ($show_captcha && $captcha_type == 'inbuilt') {
+        if ($show_captcha && $captcha_type == 'image_captcha')
+        {
             $this->form_validation->set_rules('captcha', 'captcha', 'trim|required|exact_length[7]|alpha_numeric');
         }
 
@@ -118,7 +120,7 @@ class Auth extends MX_Controller
             //Check captcha
             if ($show_captcha) {
                 $data['showCaptcha'] = true;
-                if ($captcha_type == 'inbuilt' || !empty($this->input->post('captcha'))) {
+                if ($captcha_type == 'image_captcha' || !empty($this->input->post('captcha'))) {
                     if ($this->input->post('captcha') != $this->captcha->getValue() || empty($this->input->post('captcha'))) {
                         $data['messages']["error"] = lang("captcha_invalid", "auth");
                         die(json_encode($data));
@@ -134,6 +136,13 @@ class Auth extends MX_Controller
                     $recaptcha = $this->input->post('recaptcha');
                     $score = $this->recaptcha->verifyScore($recaptcha);
                     if ($score < 0.5) {
+                        $data['messages']["error"] = lang("captcha_invalid", "auth");
+                        die(json_encode($data));
+                    }
+                } else if ($captcha_type == 'fusion_captcha') {
+                    $token = $this->input->post('cap-token');
+                    if (!$this->fusioncaptcha->verify_final_token($token)) {
+                        $data['captcha_error'] = true;
                         $data['messages']["error"] = lang("captcha_invalid", "auth");
                         die(json_encode($data));
                     }
@@ -154,11 +163,16 @@ class Auth extends MX_Controller
                 unset($_SESSION['captcha']);
                 Services::session()->remove('attempts');
 
-                // Remember me
-                if ($this->input->post("remember")) {
-                    if ($this->input->post("remember") == "true") {
-                        $this->input->set_cookie("fcms_username", $username, 60 * 60 * 24 * 365);
-                        $this->input->set_cookie("fcms_password", $sha_pass_hash["verifier"], 60 * 60 * 24 * 365);
+                // Remember me: issue a random rotating token (never store the password hash)
+                if ($this->input->post("remember"))
+                {
+                    if($this->input->post("remember") == "true")
+                    {
+                        $rawToken = $this->cms_model->issueRememberMeToken($this->user->getId());
+
+                        $cookieExpiry = $this->config->item('cookie_expire'); // 30 days
+                        $this->input->set_cookie("fcms_username", $username, $cookieExpiry);
+                        $this->input->set_cookie("fcms_token", $rawToken, $cookieExpiry);
                     }
                 }
 
@@ -170,9 +184,13 @@ class Auth extends MX_Controller
                 $this->dblogger->createLog("user", "login", "Login");
             } else {
                 $this->dblogger->createLog("user", "login", "Login", [], Dblogger::STATUS_FAILED, $this->user->getId($username));
+                $data['captcha_error'] = true;
                 $data["messages"]["error"] = lang("error", "auth");
             }
-        } else {
+        }
+        else
+        {
+            $data['captcha_error'] = true;
             $data['messages']["error"] = validation_errors();
         }
         die(json_encode($data));

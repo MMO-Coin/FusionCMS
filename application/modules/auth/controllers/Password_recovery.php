@@ -20,6 +20,7 @@ class Password_recovery extends MX_Controller
         $this->load->library('form_validation');
         $this->load->library('captcha');
         $this->load->library('recaptcha');
+        $this->load->library('FusionCaptcha');
 
         $this->user->guestArea();
 
@@ -55,7 +56,7 @@ class Password_recovery extends MX_Controller
 
         $this->form_validation->set_rules('email', 'email', 'trim|required|valid_email');
 
-        if ($use_captcha && $captcha_type == 'inbuilt')
+        if ($use_captcha && $captcha_type == 'image_captcha')
         {
             $this->form_validation->set_rules('captcha', 'captcha', 'trim|required|exact_length[7]|alpha_numeric');
         }
@@ -74,7 +75,7 @@ class Password_recovery extends MX_Controller
             {
                 $data['showCaptcha'] = true;
 
-                if ($captcha_type == 'inbuilt') {
+                if ($captcha_type == 'image_captcha') {
                     if ($this->input->post('captcha') != $this->captcha->getValue() || empty($this->input->post('captcha'))) {
                         $data['messages']["error"] = lang("captcha_invalid", "auth");
                         die(json_encode($data));
@@ -90,6 +91,13 @@ class Password_recovery extends MX_Controller
                     $recaptcha = $this->input->post('recaptcha');
                     $score = $this->recaptcha->verifyScore($recaptcha);
                     if($score < 0.5) {
+                        $data['messages']["error"] = lang("captcha_invalid", "auth");
+                        die(json_encode($data));
+                    }
+                } else if ($captcha_type == 'fusion_captcha') {
+                    $token = $this->input->post('cap-token');
+                    if (!$this->fusioncaptcha->verify_final_token($token)) {
+                        $data['captcha_error'] = true;
                         $data['messages']["error"] = lang("captcha_invalid", "auth");
                         die(json_encode($data));
                     }
@@ -114,6 +122,7 @@ class Password_recovery extends MX_Controller
         }
         else
         {
+            $data['captcha_error'] = true;
             $data['messages']["error"] = validation_errors();
         }
         die(json_encode($data));
@@ -124,7 +133,7 @@ class Password_recovery extends MX_Controller
         clientLang("password_changed", "recovery");
 
         $this->form_validation->set_rules('token', 'token', 'trim|required');
-        $this->form_validation->set_rules('new_password', 'new_password', 'trim|required|min_length[6]');
+        $this->form_validation->set_rules('new_password', 'new_password', 'trim|required|min_length[6]|max_length[16]');
 
         $this->form_validation->set_error_delimiters('', '');
 

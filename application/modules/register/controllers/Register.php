@@ -25,6 +25,7 @@ class Register extends MX_Controller
         $this->load->helper(array('form', 'url', 'security'));
         $this->load->library('form_validation');
         $this->load->library('recaptcha');
+        $this->load->library('FusionCaptcha');
 
         $this->load->helper('email_helper');
 
@@ -49,7 +50,7 @@ class Register extends MX_Controller
         //Load the form validations for if they tried to sneaky bypass our js system
         $this->form_validation->set_rules('register_username', 'username', 'trim|required|min_length[4]|max_length[24]|alpha_numeric');
         $this->form_validation->set_rules('register_email', 'email', 'trim|required|valid_email');
-        $this->form_validation->set_rules('register_password', 'password', 'trim|required|min_length[6]');
+        $this->form_validation->set_rules('register_password', 'password', 'trim|required|min_length[6]|max_length[16]');
         $this->form_validation->set_rules('register_password_confirm', 'password confirmation', 'trim|required|matches[register_password]');
 
         $this->form_validation->set_error_delimiters('<img src="' . $this->template->page_url . 'application/images/icons/exclamation.png" data-tip="', '" />');
@@ -81,8 +82,11 @@ class Register extends MX_Controller
                         }
                     } else
                         $recaptcha = 'disabled';
-                } else if ($captcha_type == 'inbuilt') {
+                } else if ($captcha_type == 'image_captcha') {
                     $captcha = strtoupper($this->input->post('register_captcha')) == strtoupper($captchaObj->getValue());
+                } else if ($captcha_type == 'fusion_captcha') {
+                    $token = $this->input->post('cap-token');
+                    $captcha = $this->fusioncaptcha->verify_final_token($token);
                 }
             } else {
                 $captcha = true;
@@ -96,7 +100,7 @@ class Register extends MX_Controller
 
         //Check if everything went correct
         if (!$this->form_validation->run() || !$captcha || !$this->input->post() || !$usernameAvailable || !$emailAvailable) {
-            $fields = array('username', 'email', 'password', 'password_confirm');
+            $fields = ['username', 'email', 'password', 'password_confirm'];
 
             $data = [
                 "username_error" => $this->usernameError,
@@ -124,9 +128,13 @@ class Register extends MX_Controller
                     if (!$captcha && !$recaptcha == 'disabled') {
                         $data['captcha_error'] = true;
                     }
-                } else if ($captcha_type == 'inbuilt') {
+                } else if ($captcha_type == 'image_captcha') {
                     if ($this->input->post('register_captcha') != $captchaObj->getValue()) {
                         $data['captcha_error'] = '<img src="' . $this->template->page_url . 'application/images/icons/exclamation.png" />';
+                    }
+                } else if ($captcha_type == 'fusion_captcha') {
+                    if(!$captcha) {
+                        $data['captcha_error'] = true;
                     }
                 }
             }

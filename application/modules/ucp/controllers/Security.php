@@ -31,20 +31,20 @@ class Security extends MX_Controller
 
         $secret = $google_obj->createSecret();
 
-        $settings_data = array(
-            'security_enabled' => !empty($this->user->getTotpSecret()) ? true : false,
+        $settings_data = [
+            'security_enabled' => !empty($this->user->getTotpSecret()),
             'secret_key' => $secret,
             'qr_code' => $google_obj->getQRCode($this->config->item('title') . ' - ' . $this->user->getUsername(), $secret),
-        );
+        ];
 
-        $data = array(
+        $data = [
             "module" => "default",
             "headline" => breadcrumb([
                             "ucp" => lang("ucp"),
                             "ucp/security" => lang("account_security", "ucp")
             ]),
             "content" => $this->template->loadPage("security.tpl", $settings_data)
-        );
+        ];
 
         $page = $this->template->loadPage("page.tpl", $data);
 
@@ -54,6 +54,11 @@ class Security extends MX_Controller
 
     public function submit()
     {
+        if ($this->external_account_model->getTotpSecret() !== null && ($this->user->getTotpSecret() != $this->external_account_model->getTotpSecret()))
+        {
+            die('no');
+        }
+
         $security_enabled = $this->input->post('security_enabled') == 'true';
 
         if ($security_enabled) {

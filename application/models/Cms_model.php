@@ -345,4 +345,98 @@ class Cms_model extends CI_Model
             ->orderBy('`order`', 'ASC')
             ->get()->getResultArray();
     }
+
+    /**
+     * Issue a new remember-me token for the given account.
+     *
+     * @param int $accountId
+     * @return string The raw token to set in the cookie (never stored as-is).
+     */
+    public function issueRememberMeToken(int $accountId): string
+    {
+        // 64 bytes = 128 hex chars of randomness
+        $rawToken = bin2hex(random_bytes(64));
+        $tokenHash = hash('sha256', $rawToken);
+
+        $this->db->table('remember_me_tokens')->insert([
+            'account_id'  => $accountId,
+            'token_hash'  => $tokenHash,
+            'expires_at'  => date('Y-m-d H:i:s', time() + $this->config->item('cookie_expire')),
+            'created_at'  => date('Y-m-d H:i:s'),
+        ]);
+
+        return $rawToken;
+    }
+
+    /**
+     * Validate a raw token from a cookie and return the matching account_id.
+     *
+     * If the token is valid and not expired the old row is deleted and a new
+     * token is issued (rotation). Returns false when the token is invalid or
+     * expired.
+     *
+     * @param string $rawToken
+     * @return array|false  ['account_id' => int, 'new_token' => string] or false
+     */
+    public function validateRememberMeToken(string $rawToken): array|false
+    {
+        $tokenHash = hash('sha256', $rawToken);
+
+        $row = $this->db->table('remember_me_tokens')
+            ->select('id, account_id, expires_at')
+            ->where('token_hash', $tokenHash)
+            ->get()
+            ->getRowArray();
+
+        if ($row === null) {
+            return false;
+        }
+
+        // Check expiry
+        if (strtotime($row['expires_at']) < time()) {
+            // Expired — delete it
+            $this->db->table('remember_me_tokens')->delete(['id' => $row['id']]);
+            return false;
+        }
+
+        // Valid — rotate: delete old, issue new
+        $this->db->table('remember_me_tokens')->delete(['id' => $row['id']]);
+
+        $newRawToken = $this->issueRememberMeToken((int) $row['account_id']);
+
+        return [
+            'account_id' => (int) $row['account_id'],
+            'new_token'  => $newRawToken,
+        ];
+    }
+
+    /**
+     * Delete all remember-me tokens for an account (e.g. on logout or
+     * password change).
+     *
+     * @param int $accountId
+     */
+    public function deleteRememberMeTokenByAccount(int $accountId): void
+    {
+        $this->db->table('remember_me_tokens')->delete(['account_id' => $accountId]);
+    }
+
+    /**
+     * Delete a specific token row by its hash (used during logout).
+     *
+     * @param string $rawToken
+     */
+    public function deleteRememberMeTokenByToken(string $rawToken): void
+    {
+        $tokenHash = hash('sha256', $rawToken);
+        $this->db->table('remember_me_tokens')->delete(['token_hash' => $tokenHash]);
+    }
+
+    /**
+     * Remove expired tokens (garbage collection).
+     */
+    public function purgeRememberMeTokenExpired(): void
+    {
+        $this->db->table('remember_me_tokens')->where('expires_at <', date('Y-m-d H:i:s'))->delete();
+    }
 }

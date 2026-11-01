@@ -755,7 +755,7 @@ var Store = {
 
 				$("#checkout").fadeOut(150, function()
 				{
-					$("#checkout").html('<center><img src="' + Config.image_path + 'ajax.gif" /></center>').fadeIn(150, function()
+					$("#checkout").html('<center><i class=\"fa-duotone fa-spinner-third fa-spin\"></i></center>').fadeIn(150, function()
 					{
 						$.post(Config.URL + "store/pay", {data: data, csrf_token_name: Config.CSRF}, function(data)
 						{

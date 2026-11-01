@@ -27,3 +27,4 @@ $lang['no_camamand'] = "قلمرو آن سرویس را پشتیبانی نمی 
 $lang['dont_enough_Donation_Points'] = "شما امتیاز کافی برای اهدا ندارید." ;
 $lang['no_service'] = "سرویس انتخابی نامعتبر است.";
 $lang['no_selected_service'] = "مشکلی پیش آمد، لطفا دوباره امتحان کنید." ;
+$lang['successfully']  = "درخواست با موفقیت انجام شد" ;

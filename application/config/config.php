@@ -230,6 +230,7 @@ $config['cookie_prefix'] = '';
 $config['cookie_domain'] = '';
 $config['cookie_path'] = '/';
 $config['cookie_secure'] = is_https();
+$config['cookie_expire'] = 60 * 60 * 24 * 30; // 30 days
 $config['cookie_httponly'] = true;
 $config['cookie_samesite'] = 'Lax';
 
@@ -277,7 +278,7 @@ $config['csrf_token_name'] = 'csrf_token_name';
 $config['csrf_cookie_name'] = 'csrf_cookie_name';
 $config['csrf_expire'] = 7200;
 $config['csrf_regenerate'] = true;
-$config['csrf_exclude_uris'] = ['donate', 'vote/callback', '.*callback.*+', '.*install.*+'];
+$config['csrf_exclude_uris'] = ['donate', 'vote/callback', '.*callback.*+', '.*install.*+', 'captcha/challenge', 'captcha/redeem'];
 
 /*
 |--------------------------------------------------------------------------
