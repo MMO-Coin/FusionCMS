@@ -1,10 +1,12 @@
 # Changelog
 
-## Unreleased
+## 9.5.2 - 2026-11-01
 
 - Keep outgoing response headers separate from incoming request headers. A session could remove the response's last default header, causing form POST responses to copy the request's content type, length and credentials. Checkout now returns the full HTML page instead of downloading a truncated file.
 - Add regressions for empty response headers and a real CSRF-protected HTML POST with request-only headers.
 - Verify a native Solflare Android donation on public devnet, including QR scanning, approval, finalization and one-time credit. Record the transaction for offline regression coverage. Phantom installs without Google sign-in but redirects to Play sign-in before onboarding, so its mobile payment test remains blocked. See the [mobile test report](docs/testing/solana-mobile-devnet-2026-11-01.md).
+
+This stable patch accepts the untested Phantom mobile flow as a coverage gap based on the passing Solflare flow and automated regressions. Phantom compatibility remains unverified. No database migration is needed when upgrading from 9.5.1.
 
 ## 9.5.1 - 2026-11-01
 

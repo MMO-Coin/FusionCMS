@@ -1,6 +1,6 @@
 # Upgrading the MMO-Coin FusionCMS fork
 
-This guide covers the `9.5.1` release of [MMO-Coin/FusionCMS](https://github.com/MMO-Coin/FusionCMS), including upgrades from the `9.5.0-mmo.1` preview. It includes upstream FusionCMS 9.5.0 changes and the MMOCoin donation module 1.1.1.
+This guide covers the `9.5.2` release of [MMO-Coin/FusionCMS](https://github.com/MMO-Coin/FusionCMS), including upgrades from `9.5.1` and the `9.5.0-mmo.1` preview. It includes upstream FusionCMS 9.5.0 changes and the MMOCoin donation module 1.1.1.
 
 ## Before you upgrade
 
@@ -12,6 +12,8 @@ This guide covers the `9.5.1` release of [MMO-Coin/FusionCMS](https://github.com
 The version check uses upstream PHP version numbers. It does not recognize distribution backports or detect Windows package rebuilds.
 
 PHP's cURL runtime must have a working CA trust store for the configured HTTPS RPC provider. Configure `curl.cainfo` when your PHP distribution does not provide one. Keep TLS certificate verification enabled.
+
+If upgrading from `9.5.1`, deploy the updated files while preserving local configuration, then clear compiled templates. No database migration is needed for this patch. It fixes checkout responses that could copy request headers and download a truncated file instead of rendering HTML.
 
 If upgrading from `9.5.0-mmo.1`, deploy the updated files and clear compiled templates. The donation schema has not changed since that preview. The request limiter creates `writable/cache/throttle`; PHP must be able to write there. Its limits are shared by workers using the same filesystem. Installations with multiple web nodes need shared storage for that directory to enforce one limit across nodes.
 

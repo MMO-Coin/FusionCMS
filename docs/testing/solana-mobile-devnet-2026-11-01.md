@@ -34,7 +34,7 @@ The native [Solflare payment review](assets/solflare-devnet-review-2026-11-01.pn
 
 The official Play package installed through Aurora without a personal Google sign-in. Both a normal launcher invocation and Aurora's Open button returned to the [Google Play sign-in screen](assets/phantom-play-redirect-2026-11-01.png). No Phantom onboarding or payment UI appeared. The precise cause of that redirect was not established.
 
-Testing stopped there to keep the requested no-Google-sign-in setup. No Phantom wallet was created or funded. Payment compatibility with Phantom remains unverified. A new stable release remains on hold while that mobile test is incomplete.
+Testing stopped there to keep the requested no-Google-sign-in setup. No Phantom wallet was created or funded. Payment compatibility with Phantom remains unverified. The 9.5.2 stable release accepts this test coverage gap based on the passing native Solflare flow and automated regressions.
 
 ## Checkout defect found
 
