@@ -1,7 +1,7 @@
 name: PHP Composer
 
 env:
-  PHP_VERSION: '8.3'
+  PHP_VERSION: '8.3.36'
 
 on:
   push:
@@ -28,6 +28,9 @@ jobs:
     - name: Validate composer.json and composer.lock
       run: composer validate --strict
 
+    - name: Audit locked Composer dependencies
+      run: composer audit --locked --no-interaction
+
     - name: Cache Composer packages
       id: composer-cache
       uses: actions/cache@v6
@@ -42,3 +45,6 @@ jobs:
 
     - name: Run configuration regression tests
       run: php tests/config_editor_test.php
+
+    - name: Run PHP requirement regression tests
+      run: php tests/php_requirements_test.php

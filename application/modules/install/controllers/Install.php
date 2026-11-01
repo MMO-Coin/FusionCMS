@@ -1,5 +1,6 @@
 <?php
 
+use App\Config\Requirements;
 use CodeIgniter\Database\Exceptions\DatabaseException;
 use MX\MX_Controller;
 
@@ -27,6 +28,7 @@ class Install extends MX_Controller
             'css' => basename(APPPATH) . '/modules/install/css/install.css',
             'install_path' => basename(APPPATH) . '/modules/install/',
             'upgrade_url' => base_url('install/upgrade'),
+            'php_requirement' => Requirements::phpVersionLabel(),
             'year' => date('Y'),
         ];
 
@@ -336,7 +338,7 @@ class Install extends MX_Controller
 
     private function checkPhpVersion()
     {
-        die(version_compare(PHP_VERSION, '8.3.0', '>=') ? '1' : '0');
+        die(Requirements::supportsPhpVersion(PHP_VERSION) ? '1' : '0');
     }
 
     private function setAndCheckDbConnection()

@@ -83,10 +83,12 @@ Read the [Installation Guide](https://github.com/FusionWowCMS/FusionCMS/wiki/Ins
 
 | Requirements                           | Description                                                                                |
 |----------------------------------------|--------------------------------------------------------------------------------------------|
-| PHP 8.3.0 or above                     | (Extensions: mysqli, curl, openssl, soap, mbstring, json, zip, gd, intl and gmp)           |
+| PHP 8.3.36+, 8.4.27+ or 8.5.12+       | (Extensions: mysqli, curl, openssl, soap, mbstring, json, zip, gd, intl and gmp)           |
 | Apache / Nginx                         | (Modules: mod_rewrite, mod_headers, mod_expires, mod_deflate, mod_filter)                  |
 | Pre installed World of Warcraft Server | (with the databases of: Auth, Characters and World)                                        |
 | MySQL / Mariadb Server                 | >= 5.6 / 10.3                                                                              |
+
+These PHP minimums include the fixes for [CVE-2026-109618 and CVE-2026-109619](https://www.php.net/archive/2026.php). Use the latest security release for your PHP branch. Windows users should install the updated `-1` packages or newer builds, which also include the Brotli security fix.
 
 ### Security Tips
 > [!IMPORTANT]

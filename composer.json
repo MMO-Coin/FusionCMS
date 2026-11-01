@@ -14,7 +14,7 @@
         }
     },
     "require": {
-        "php": ">=8.3",
+        "php": "~8.3.36-stable || ~8.4.27-stable || ~8.5.12-stable",
 
         "ext-curl": "*",
         "ext-mysqli": "*",

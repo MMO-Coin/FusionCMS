@@ -16,11 +16,12 @@ if (getcwd() . DIRECTORY_SEPARATOR !== FCPATH) {
  *---------------------------------------------------------------
  */
 
-$minPhpVersion = '8.1'; // If you update this, don't forget to update `spark`.
-if (version_compare(PHP_VERSION, $minPhpVersion, '<')) {
+require_once FCPATH . 'application/config/Requirements.php';
+
+if (!\App\Config\Requirements::supportsPhpVersion(PHP_VERSION)) {
     $message = sprintf(
-        'Your PHP version must be %s or higher to run FusionCMS. Current version: %s',
-        $minPhpVersion,
+        'FusionCMS requires PHP %s within the listed branches. Current version: %s',
+        \App\Config\Requirements::phpVersionLabel(),
         PHP_VERSION,
     );
 
