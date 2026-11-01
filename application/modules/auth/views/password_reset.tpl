@@ -4,7 +4,7 @@
             <div class="alert text-center error-feedback d-none" role="alert"></div>
 
 			<label>{lang('token', 'recovery')}</label>
-			<input type="text" value="{$token}" class="token-input mb-3" required>
+			<input type="text" value="{$token|escape}" class="token-input mb-3" required>
 
 			<label>{lang('new_password', 'recovery')}</label>
 			<input type="password" class="password-input mb-3"required>

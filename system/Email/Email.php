@@ -2161,14 +2161,12 @@ class Email
      */
     protected function getHostname()
     {
-        $superglobals = service('superglobals');
-
-        $serverName = $superglobals->server('SERVER_NAME');
+        $serverName = $_SERVER['SERVER_NAME'] ?? null;
         if (! in_array($serverName, [null, ''], true)) {
             return $serverName;
         }
 
-        $serverAddr = $superglobals->server('SERVER_ADDR');
+        $serverAddr = $_SERVER['SERVER_ADDR'] ?? null;
         if (! in_array($serverAddr, [null, ''], true)) {
             return '[' . $serverAddr . ']';
         }

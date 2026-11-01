@@ -143,7 +143,7 @@ class Password_recovery extends MX_Controller
             {
                 $new_password = $this->input->post('new_password');
                 $token = $this->input->post('token');
-                $token_data = $this->password_recovery_model->get_token($token);
+                $token_data = $this->password_recovery_model->consume_token($token);
 
                 if (!$token_data)
                 {
@@ -154,8 +154,6 @@ class Password_recovery extends MX_Controller
                 $this->external_account_model->setPassword($token_data['username'], $token_data['email'], $new_password);
                 
                 $this->dblogger->createLog("user", "recovery", "Password changed via reset", [], Dblogger::STATUS_SUCCEED, $this->user->getId($token_data['username']));
-
-                $this->password_recovery_model->delete_token($token);
 
                 $data['messages']["success"] = lang("password_reset_success", "recovery");
                 die(json_encode($data));
@@ -170,7 +168,8 @@ class Password_recovery extends MX_Controller
         $this->template->setTitle(lang("password_reset", "recovery"));
 
         $data = [];
-        $data['token'] = $this->input->get('token');
+        $token = $this->input->get('token');
+        $data['token'] = is_string($token) ? $token : '';
 
         $content = $this->template->loadPage("password_reset.tpl", $data);
         $box = $this->template->box(lang("password_reset", "recovery"), $content);

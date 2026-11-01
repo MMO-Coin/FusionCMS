@@ -57,8 +57,10 @@ function assertOwner(mysqli $db, string $database, string $nonce): void {
 }
 function resetFixture(mysqli $db, array $config): void {
     $db->select_db($config['cms']);
-    foreach (['donate_mmo_transactions', 'monthly_income', 'failed_logins', 'remember_me_tokens'] as $table) $db->query("DELETE FROM `$table`");
+    foreach (['donate_mmo_transactions', 'monthly_income', 'failed_logins', 'remember_me_tokens', 'password_recovery_key', 'email_log'] as $table) $db->query("DELETE FROM `$table`");
     $db->query('UPDATE account_data SET dp = 0, vp = 0');
+    $db->select_db($config['auth']);
+    $db->query("UPDATE account SET sha_pass_hash = UPPER(SHA1(CONCAT(username, ':BROWSERTEST123')))");
 }
 if ($action === 'setup') {
     // CREATE without IF NOT EXISTS prevents the installer SQL from touching an existing database.
@@ -88,7 +90,8 @@ if ($action === 'setup') {
     $db->query('CREATE TABLE ip_banned (ip VARCHAR(45), banreason VARCHAR(255), bandate INT, unbandate INT, bannedby VARCHAR(50))');
     foreach ([1 => 'E2EPLAYER', 2 => 'E2EOTHER', 3 => 'E2EOWNER'] as $id => $username) {
         $hash = strtoupper(sha1($username . ':BROWSERTEST123'));
-        $db->query("INSERT INTO account (id, username, sha_pass_hash, email, joindate, last_ip, last_login) VALUES ($id, '$username', '$hash', 'browser@example.invalid', UTC_TIMESTAMP(), '127.0.0.1', UTC_TIMESTAMP())");
+        $email = strtolower($username) . '@example.invalid';
+        $db->query("INSERT INTO account (id, username, sha_pass_hash, email, joindate, last_ip, last_login) VALUES ($id, '$username', '$hash', '$email', UTC_TIMESTAMP(), '127.0.0.1', UTC_TIMESTAMP())");
     }
     $connections = [];
     foreach (['cms', 'account'] as $group) {
@@ -100,10 +103,12 @@ if ($action === 'setup') {
     require $site . '/application/libraries/ConfigEditor.php';
     copy($site . '/application/config/fusion.php.dist', $site . '/application/config/fusion.php');
     foreach ([
-        'fusion' => ['title' => 'FusionCMS Browser E2E', 'server_name' => 'Browser Fixture', 'cache' => false, 'detect_language' => false, 'slider' => false, 'security_code' => 'BrowserFixtureOnly'],
+        'fusion' => ['title' => 'FusionCMS Browser E2E', 'server_name' => 'Browser Fixture', 'cache' => false, 'detect_language' => false, 'slider' => false, 'security_code' => 'BrowserFixtureOnly', 'has_smtp' => 1],
         'auth' => ['account_encryption' => 'SPH', 'rbac' => false, 'battle_net' => false, 'totp_secret' => false],
         'captcha' => ['use_captcha' => false, 'captcha_attemps' => 100],
         'config' => ['encryption_key' => bin2hex(random_bytes(32))],
+        'smtp' => ['smtp_protocol' => 'smtp', 'smtp_host' => '127.0.0.1', 'smtp_port' => $config['smtpPort'],
+            'smtp_user' => '', 'smtp_pass' => '', 'smtp_crypto' => '', 'smtp_sender' => 'noreply@example.invalid'],
     ] as $file => $values) {
         $editor = new ConfigEditor($site . '/application/config/' . $file . '.php');
         foreach ($values as $key => $value) $editor->set($key, $value);
@@ -126,6 +131,14 @@ if ($action === 'cleanup') {
     foreach ($config['created'] as $database) $db->query("DROP DATABASE `$database`");
 } elseif ($action === 'reset') {
     resetFixture($db, $config);
+} elseif ($action === 'age-recovery') {
+    if (!preg_match('/^[a-f0-9]{128}$/D', $argv[3]) || !ctype_digit($argv[4]) || (int) $argv[4] > 86400) {
+        throw new RuntimeException('Invalid reset-token age fixture.');
+    }
+    $db->select_db($config['cms']);
+    $issued = time() - (int) $argv[4];
+    $statement = $db->prepare('UPDATE password_recovery_key SET time = ? WHERE recoverykey = ?');
+    $statement->bind_param('is', $issued, $argv[3]); $statement->execute();
 } elseif ($action === 'snapshot') {
     $db->select_db($config['cms']);
     echo json_encode([

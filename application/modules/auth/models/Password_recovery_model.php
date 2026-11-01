@@ -4,6 +4,8 @@ use CodeIgniter\Database\BaseConnection;
 
 class Password_recovery_model extends CI_Model
 {
+    public const TOKEN_LIFETIME = 3600;
+
     private BaseConnection $connection;
 
     public function __construct()
@@ -25,20 +27,30 @@ class Password_recovery_model extends CI_Model
 
     public function get_token($token)
     {
-        if ($token)
-        {
-            $query = $this->db->table('password_recovery_key')->select()->where('recoverykey', $token)->get();
-
-            $result = $query->getResultArray();
-            if (isset($result[0]['recoverykey']) == $token)
-            {
-                return $result[0];
-            } else {
-                return false;
-            }
-        } else {
+        if (!is_string($token) || !preg_match('/^[a-f0-9]{128}$/D', $token)) {
             return false;
         }
+        $now = time();
+        return $this->db->table('password_recovery_key')
+            ->where('recoverykey', $token)
+            ->where('time >', $now - self::TOKEN_LIFETIME)
+            ->where('time <=', $now)
+            ->get()->getRowArray() ?: false;
+    }
+
+    public function consume_token($token)
+    {
+        $record = $this->get_token($token);
+        if (!$record) return false;
+
+        // Only one request may claim the token, even when lookups overlap.
+        $now = time();
+        $deleted = $this->db->table('password_recovery_key')
+            ->where('recoverykey', $token)
+            ->where('time >', $now - self::TOKEN_LIFETIME)
+            ->where('time <=', $now)
+            ->delete();
+        return $deleted && $this->db->affectedRows() === 1 ? $record : false;
     }
 
     public function insert_token($token, $username, $email, $ip)

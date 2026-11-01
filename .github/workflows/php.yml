@@ -85,6 +85,12 @@ jobs:
     - name: Run donation request regression tests
       run: php tests/donation_controller_test.php
 
+    - name: Run password reset regressions and concurrent token claims
+      env:
+        FUSION_TEST_MYSQL_HOST: 127.0.0.1
+        FUSION_TEST_MYSQL_PASSWORD: fusion_test
+      run: php tests/password_recovery_test.php
+
     - name: Run donation frontend regression tests
       run: node tests/donation_frontend_test.cjs
 
@@ -102,7 +108,7 @@ jobs:
       working-directory: tests/browser
       run: npx playwright install --with-deps chromium
 
-    - name: Run login and donation browser tests
+    - name: Run authentication and donation browser tests
       env:
         FUSION_E2E_DB_HOST: 127.0.0.1
         FUSION_E2E_DB_PASSWORD: fusion_test

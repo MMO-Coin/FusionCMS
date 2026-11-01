@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Expire password reset links after one hour and atomically consume each valid token before changing the password, preventing sequential and concurrent reuse. No schema migration is needed. Escape reset-token form values and remove recovery request logging from the browser console.
+- Add password recovery browser tests using a local SMTP inbox, covering the actual emailed link, validation retries, token expiry, reuse rejection and old/new password login. Add a concurrent MySQL token-claim regression.
+- Fix SMTP hostname lookup so recovery email delivery works without the unavailable `superglobals` service.
 - Run the full CMS login and donation checkout flows in Chromium at desktop and mobile sizes on all three supported PHP versions in CI.
 - Add isolated CMS and auth database fixtures, a local HTTPS RPC fixture, QR decoding, payment rejection checks and one-time credit assertions. Browser CI does not sign or broadcast transactions.
 - Save browser reports, failure screenshots, videos, traces and server logs as CI artifacts. Document the local setup in the [browser test guide](docs/testing/browser-ci.md).

@@ -1,11 +1,12 @@
-# Login and donation browser tests
+# Authentication and donation browser tests
 
-The browser suite starts the real FusionCMS application and drives its normal login and donation forms. GitHub CI runs it on PHP 8.3.36, 8.4.27 and 8.5.12, with Chromium at desktop and Pixel 7 viewport sizes.
+The browser suite starts the real FusionCMS application and drives its normal login, password recovery and donation forms. GitHub CI runs it on PHP 8.3.36, 8.4.27 and 8.5.12, with Chromium at desktop and Pixel 7 viewport sizes.
 
 ## What it covers
 
 - Guests must sign in before viewing donation packages.
 - A wrong password shows an error. A correct password opens the account panel, the session survives reload, and logout removes access. Session and CSRF cookie flags are checked.
+- Password recovery sends a message through the application's SMTP client to a local inbox. Its actual link accepts a valid reset once, survives a password-validation error, and rejects reuse, malformed tokens and tokens at the one-hour expiry boundary. The old password stops working and the new password signs in normally.
 - A form POST renders the complete HTML checkout without reflecting request headers. The actual QR image decodes to the invoice's merchant, mint, amount and reference.
 - The checkout's own JavaScript polls by POST and uses the renewed CSRF nonce on its next poll.
 - A valid RPC response completes the invoice, reaches the success page, grants 25 DP and records income once. Three repeated verification requests leave those records unchanged.
@@ -13,6 +14,10 @@ The browser suite starts the real FusionCMS application and drives its normal lo
 - RPC outages, underpayment, wrong-token, wrong-recipient and failed payment responses leave the invoice pending without granting points.
 
 The controller, session, CSRF middleware, templates, JavaScript, payment verifier and database transaction all run normally. The RPC server is a local HTTPS fixture. It adapts recorded public devnet responses to each new invoice's reference and payment time. It does not sign or broadcast transactions, or replace the separate [mobile wallet test](solana-mobile-devnet-2026-11-01.md).
+
+The SMTP inbox binds only to loopback and captures messages without relaying them. Test email addresses use `example.invalid`. Mailbox contents and generated configuration stay in the temporary runtime and are excluded from artifact uploads. Expiry tests age only the fixture token's issue time rather than waiting an hour. The database regression additionally forces two independent MySQL workers to read the same token before competing to claim it.
+
+Reset links are valid for one hour from issuance. A valid token is consumed before the auth database password is updated, so a failed password update requires a new recovery link. The CMS and game account databases can live on different servers; consuming first prevents reuse across that boundary. This change uses the existing token timestamp and needs no database migration.
 
 ## Run locally
 

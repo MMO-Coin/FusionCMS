@@ -73,11 +73,8 @@ var Recovery = {
 					
 				} catch(e) {
 					console.error(e);
-					console.log(data);
 				}				
 			});
-
-			console.log(postData);
 
 		}, 500);
 	},
@@ -85,9 +82,7 @@ var Recovery = {
     reset: function() {
 		var postData = {
 			"token": $(".token-input").val(),
-            "new_password": $(".password-input").val(),
-			"csrf_token_name": Config.CSRF,
-			"csrf_token": Config.CSRF
+			"new_password": $(".password-input").val()
 		};
 
 		clearTimeout (Recovery.timeout);
@@ -96,7 +91,6 @@ var Recovery = {
 			$.post(Config.URL + "password_recovery/reset_password", postData, function(data) {
 				try {
 					data = JSON.parse(data);
-					console.log(data);
 
 					if(data["messages"]["error"]) {
 						if($(".password-input").val() != "") {
@@ -112,11 +106,8 @@ var Recovery = {
 					
 				} catch(e) {
 					console.error(e);
-					console.log(data);
 				}				
 			});
-
-			console.log(postData);
 
 		}, 500);
 	},

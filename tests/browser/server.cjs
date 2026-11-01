@@ -4,6 +4,7 @@ const path = require('node:path');
 const https = require('node:https');
 const crypto = require('node:crypto');
 const {spawn, execFileSync} = require('node:child_process');
+const {startInbox} = require('./smtp.cjs');
 
 const repo = path.resolve(__dirname, '../..');
 const output = path.join(repo, 'output/playwright');
@@ -14,6 +15,7 @@ const root = fs.mkdtempSync(path.join(os.tmpdir(), 'fusioncms-browser-e2e-'));
 const site = path.join(root, 'site');
 const configPath = path.join(root, 'fixture.json');
 const scenarioPath = path.join(root, 'scenarios.json');
+const mailPath = path.join(root, 'mailbox.json');
 const id = crypto.randomBytes(6).toString('hex');
 const config = {
     root, nonce: crypto.randomBytes(16).toString('hex'), created: [],
@@ -23,7 +25,7 @@ const config = {
     dbPassword: process.env.FUSION_E2E_DB_PASSWORD || 'fusion_test',
     dbPort: Number(process.env.FUSION_E2E_DB_PORT || 3306),
 };
-let rpc, child, phpLog, stopping;
+let rpc, inbox, child, phpLog, stopping;
 function fixture(action) {
     return execFileSync(php, [path.join(__dirname, 'fixture.php'), action, configPath], {encoding: 'utf8', windowsHide: true});
 }
@@ -43,9 +45,15 @@ async function stop() {
             await exited;
         }
         if (phpLog) await new Promise(resolve => phpLog.end(resolve));
+        const logs = path.join(site, 'writable/logs');
+        if (fs.existsSync(logs)) {
+            const entries = fs.readdirSync(logs).filter(name => /^log-.*\.php$/.test(name));
+            fs.writeFileSync(path.join(output, 'logs/cms.log'), entries.map(name => fs.readFileSync(path.join(logs, name), 'utf8')).join('\n'));
+        }
         let cleanupError;
         try {fixture('cleanup');} catch (error) {cleanupError = error;}
         if (rpc) await new Promise(resolve => rpc.close(resolve));
+        if (inbox) await inbox.close();
         if (cleanupError) throw cleanupError;
         if (fs.existsSync(manifest) && JSON.parse(fs.readFileSync(manifest)).root === root) fs.unlinkSync(manifest);
         removeRuntime();
@@ -121,10 +129,12 @@ process.on('SIGINT', () => stop().then(() => process.exit(0), error => {console.
     });
     await new Promise((resolve, reject) => {rpc.once('error', reject); rpc.listen(0, '127.0.0.1', resolve);});
     config.rpcUrl = `https://127.0.0.1:${rpc.address().port}`;
+    inbox = await startInbox(mailPath);
+    config.smtpPort = inbox.port;
     fs.writeFileSync(configPath, JSON.stringify(config), {mode: 0o600});
     console.log(fixture('setup').trim());
     // The manifest stays outside the served site and is excluded from uploaded CI artifacts.
-    fs.writeFileSync(manifest, JSON.stringify({root, configPath, scenarioPath, php, rpcUrl: config.rpcUrl, nonce: config.nonce}), {mode: 0o600});
+    fs.writeFileSync(manifest, JSON.stringify({root, configPath, scenarioPath, mailPath, php, rpcUrl: config.rpcUrl, nonce: config.nonce}), {mode: 0o600});
     phpLog = fs.createWriteStream(path.join(output, 'logs/php.log'), {flags: 'w'});
     child = spawn(php, ['-d', `curl.cainfo=${path.join(root, 'rpc-cert.pem')}`, '-d', 'memory_limit=512M', '-S', `127.0.0.1:${port}`, '-t', site, path.join(site, 'router.php')], {
         cwd: site, env: {...process.env, CI_ENVIRONMENT: 'production'}, windowsHide: true, stdio: ['ignore', 'pipe', 'pipe'],

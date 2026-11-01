@@ -26,10 +26,10 @@ async function openPage(page, url) {
 async function blockExternal(context, baseURL) {
     await context.route('**/*', route => new URL(route.request().url()).origin === new URL(baseURL).origin ? route.continue() : route.abort());
 }
-async function login(page, username = 'E2EPLAYER') {
+async function login(page, username = 'E2EPLAYER', password = 'BrowserTest123') {
     await openPage(page, '/login');
     await page.locator('#floatingUser').fill(username);
-    await page.locator('#floatingPassword').fill('BrowserTest123');
+    await page.locator('#floatingPassword').fill(password);
     await page.locator('#floatingPassword').press('Enter');
     await expect(page).toHaveURL(/\/ucp$/);
 }
@@ -64,9 +64,11 @@ const test = base.extend({
     isolatedFixture: [async ({context, baseURL}, use) => {
         fixture('reset');
         fs.writeFileSync(runtime().scenarioPath, '{}');
+        fs.writeFileSync(runtime().mailPath, '[]');
         // Keep browser tests independent of third-party CDNs and services.
         await blockExternal(context, baseURL);
         await use();
     }, {auto: true}],
 });
-module.exports = {test, expect, login, openPage, blockExternal, checkout, verify, scenario, snapshot, fixture, shutdown};
+function inbox() { return JSON.parse(fs.readFileSync(runtime().mailPath)); }
+module.exports = {test, expect, login, openPage, blockExternal, checkout, verify, scenario, snapshot, fixture, inbox, shutdown};
