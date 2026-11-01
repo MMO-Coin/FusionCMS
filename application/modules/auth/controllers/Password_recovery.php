@@ -152,6 +152,7 @@ class Password_recovery extends MX_Controller
                 }
 
                 $this->external_account_model->setPassword($token_data['username'], $token_data['email'], $new_password);
+                $this->cms_model->deleteRememberMeTokenByAccount((int) $this->user->getId($token_data['username']));
                 
                 $this->dblogger->createLog("user", "recovery", "Password changed via reset", [], Dblogger::STATUS_SUCCEED, $this->user->getId($token_data['username']));
 

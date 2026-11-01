@@ -26,10 +26,11 @@ async function openPage(page, url) {
 async function blockExternal(context, baseURL) {
     await context.route('**/*', route => new URL(route.request().url()).origin === new URL(baseURL).origin ? route.continue() : route.abort());
 }
-async function login(page, username = 'E2EPLAYER', password = 'BrowserTest123') {
+async function login(page, username = 'E2EPLAYER', password = 'BrowserTest123', remember = false) {
     await openPage(page, '/login');
     await page.locator('#floatingUser').fill(username);
     await page.locator('#floatingPassword').fill(password);
+    if (remember) await page.locator('label[for="checkRemember"]').click();
     await page.locator('#floatingPassword').press('Enter');
     await expect(page).toHaveURL(/\/ucp$/);
 }

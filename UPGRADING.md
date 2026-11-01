@@ -11,6 +11,8 @@ This guide covers the `9.5.2` release of [MMO-Coin/FusionCMS](https://github.com
 
 The version check uses upstream PHP version numbers. It does not recognize distribution backports or detect Windows package rebuilds.
 
+Changes on `main` after `9.5.2` also expire password reset links after one hour and harden remembered logins. Logout and password recovery revoke every remembered device for that account. Legacy `fcms_password` cookies no longer sign users in; affected users must enter their password again. These changes use the existing tables and need no additional SQL migration. Other browsers' active PHP sessions are not revoked by these remember-me changes.
+
 PHP's cURL runtime must have a working CA trust store for the configured HTTPS RPC provider. Configure `curl.cainfo` when your PHP distribution does not provide one. Keep TLS certificate verification enabled.
 
 If upgrading from `9.5.1`, deploy the updated files while preserving local configuration, then clear compiled templates. No database migration is needed for this patch. It fixes checkout responses that could copy request headers and download a truncated file instead of rendering HTML.

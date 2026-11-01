@@ -96,6 +96,10 @@ Events::on('pre_controller', static function () {
     if(!isset(CI::$APP->user))
         return;
 
+    // Password-hash cookies cannot be revoked server-side. Retire that format.
+    if(CI::$APP->input->cookie('fcms_password') !== null)
+        CI::$APP->input->set_cookie('fcms_password', '');
+
     // Remember-me cookie login: only when the user is not signed in yet
     if(!CI::$APP->user->isOnline())
     {
@@ -105,17 +109,11 @@ Events::on('pre_controller', static function () {
         // Token: Read the random rotating token (replaces the old password hash)
         $rawToken = CI::$APP->input->cookie('fcms_token');
 
-        // Fallback: legacy password hash cookie (for backward compatibility)
-        // TODO: remove after all users have re-logged-in with the new token system.
-        $legacyPassword = CI::$APP->input->cookie('fcms_password');
-        if($legacyPassword && column('account', 'verifier') && column('account', 'salt') && CI::$APP->config->item('account_encryption') != 'SPH')
-            $legacyPassword = urldecode(preg_replace('~.(?:fcms_password=([^;]+))?~', '$1', @$_SERVER['HTTP_COOKIE']));
-
-        if($username && $rawToken)
+        if($username !== null || $rawToken !== null)
         {
-            // Validate the random token against the DB (rotates on success)
-            $tokenResult = CI::$APP->cms_model->validateRememberMeToken($rawToken);
-
+            $tokenResult = is_string($username) && $username !== '' && is_string($rawToken)
+                ? CI::$APP->cms_model->validateRememberMeToken($rawToken) : false;
+            $restored = false;
             if($tokenResult)
             {
                 // Token valid: authenticate using the account's stored password
@@ -124,39 +122,23 @@ Events::on('pre_controller', static function () {
                 {
                     $user = CI::$APP->user->setUserDetails($accountRow['username'], $accountRow['verifier'] ?? strtoupper($accountRow['sha_pass_hash']));
 
-                    // Set the rotated token cookie
-                    $cookieExpiry = CI::$APP->config->item('cookie_expire');
-                    CI::$APP->input->set_cookie("fcms_token", $tokenResult['new_token'], $cookieExpiry);
-
-                    $redirect = true;
-                    if(in_array(strtolower(str_replace(CI::$APP->config->item('controller_suffix') ?? '', '', (CI::$APP->router->module ?? ''))), ['api']))
-                        $redirect = false;
-
-                    if($user == 0 && $redirect)
-                        redirect(str_replace(base_url(), '', current_url()) ?? CI::$APP->router->default_controller);
+                    if($user === 0)
+                    {
+                        $restored = true;
+                        $cookieExpiry = CI::$APP->config->item('cookie_expire');
+                        CI::$APP->input->set_cookie('fcms_username', $accountRow['username'], $cookieExpiry);
+                        CI::$APP->input->set_cookie('fcms_token', $tokenResult['new_token'], $cookieExpiry);
+                        if(strtolower(str_replace(CI::$APP->config->item('controller_suffix') ?? '', '', (CI::$APP->router->module ?? ''))) !== 'api')
+                            redirect(str_replace(base_url(), '', current_url()) ?? CI::$APP->router->default_controller);
+                    }
                 }
+                if(!$restored)
+                    CI::$APP->cms_model->deleteRememberMeTokenByToken($tokenResult['new_token']);
             }
-        }
-        // Legacy fallback: old password-hash cookie (backward compatibility)
-        elseif($username && $legacyPassword)
-        {
-            $user = CI::$APP->user->setUserDetails($username, $legacyPassword);
-
-            $redirect = true;
-            if(in_array(strtolower(str_replace(CI::$APP->config->item('controller_suffix') ?? '', '', (CI::$APP->router->module ?? ''))), ['api']))
-                $redirect = false;
-
-            if($user == 0)
+            if(!$restored)
             {
-                // Upgrade: issue a new token so next visit uses the secure flow
-                $newToken = CI::$APP->cms_model->issueRememberMeToken(CI::$APP->user->getId());
-                $cookieExpiry = CI::$APP->config->item('cookie_expire');
-                CI::$APP->input->set_cookie("fcms_token", $newToken, $cookieExpiry);
-                // Clear legacy cookie
-                CI::$APP->input->set_cookie("fcms_password", false);
-
-                if($redirect)
-                    redirect(str_replace(base_url(), '', current_url()) ?? CI::$APP->router->default_controller);
+                CI::$APP->input->set_cookie('fcms_username', '');
+                CI::$APP->input->set_cookie('fcms_token', '');
             }
         }
     }

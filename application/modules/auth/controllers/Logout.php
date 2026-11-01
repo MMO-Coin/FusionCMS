@@ -18,11 +18,8 @@ class Logout extends MX_Controller
 
     public function index()
     {
-        // Delete remember-me token from DB before clearing cookies
-        $rawToken = $this->input->cookie('fcms_token');
-        if ($rawToken) {
-            $this->cms_model->deleteRememberMeTokenByToken($rawToken);
-        }
+        // Revoke every remembered login, including a token rotated on this request.
+        $this->cms_model->deleteRememberMeTokenByAccount($this->user->getId());
 
         // Clear all remember-me cookies
         $this->input->set_cookie("fcms_username", false);

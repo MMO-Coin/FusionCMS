@@ -139,6 +139,17 @@ if ($action === 'cleanup') {
     $issued = time() - (int) $argv[4];
     $statement = $db->prepare('UPDATE password_recovery_key SET time = ? WHERE recoverykey = ?');
     $statement->bind_param('is', $issued, $argv[3]); $statement->execute();
+} elseif ($action === 'expire-remember') {
+    if (!preg_match('/^[a-f0-9]{128}$/D', $argv[3])) throw new RuntimeException('Invalid remembered-login fixture token.');
+    $db->select_db($config['cms']);
+    $expires = gmdate('Y-m-d H:i:s');
+    $hash = hash('sha256', $argv[3]);
+    $statement = $db->prepare('UPDATE remember_me_tokens SET expires_at = ? WHERE token_hash = ?');
+    $statement->bind_param('ss', $expires, $hash); $statement->execute();
+    if ($statement->affected_rows !== 1) throw new RuntimeException('Expected one remembered login to expire.');
+} elseif ($action === 'remembered') {
+    $db->select_db($config['cms']);
+    echo json_encode($db->query('SELECT * FROM remember_me_tokens ORDER BY id')->fetch_all(MYSQLI_ASSOC), JSON_THROW_ON_ERROR);
 } elseif ($action === 'snapshot') {
     $db->select_db($config['cms']);
     echo json_encode([

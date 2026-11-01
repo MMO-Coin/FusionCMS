@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Rotate remember-me tokens with an atomic update to the existing row. Reject expired and reused tokens, clear invalid cookies, and revoke all remembered devices for the account on logout or password recovery. Retire legacy password-hash cookies; users with that old format must sign in again. No schema migration is needed.
+- Add desktop and mobile remember-me browser coverage and concurrent MySQL checks for rotation, expiry and account revocation.
 - Expire password reset links after one hour and atomically consume each valid token before changing the password, preventing sequential and concurrent reuse. No schema migration is needed. Escape reset-token form values and remove recovery request logging from the browser console.
 - Add password recovery browser tests using a local SMTP inbox, covering the actual emailed link, validation retries, token expiry, reuse rejection and old/new password login. Add a concurrent MySQL token-claim regression.
 - Fix SMTP hostname lookup so recovery email delivery works without the unavailable `superglobals` service.
