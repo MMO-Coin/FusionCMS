@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+- Run the full CMS login and donation checkout flows in Chromium at desktop and mobile sizes on all three supported PHP versions in CI.
+- Add isolated CMS and auth database fixtures, a local HTTPS RPC fixture, QR decoding, payment rejection checks and one-time credit assertions. Browser CI does not sign or broadcast transactions.
+- Save browser reports, failure screenshots, videos, traces and server logs as CI artifacts. Document the local setup in the [browser test guide](docs/testing/browser-ci.md).
+
 ## 9.5.2 - 2026-11-01
 
 - Keep outgoing response headers separate from incoming request headers. A session could remove the response's last default header, causing form POST responses to copy the request's content type, length and credentials. Checkout now returns the full HTML page instead of downloading a truncated file.

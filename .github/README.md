@@ -81,6 +81,8 @@ Read the [Installation Guide](https://github.com/FusionWowCMS/FusionCMS/wiki/Ins
 
 For this fork's existing-site migrations and rollback steps, read [UPGRADING.md](../UPGRADING.md). Changes are listed in the [changelog](../CHANGELOG.md).
 
+For the repeatable login and donation browser tests, see the [browser test guide](../docs/testing/browser-ci.md). CI runs these flows at desktop and mobile sizes with disposable databases and a local RPC fixture.
+
 ### Prerequisites
 
 | Requirements                           | Description                                                                                |
