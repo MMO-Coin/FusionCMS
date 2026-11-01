@@ -22,6 +22,16 @@ CREATE TABLE `account_data`  (
 -- ----------------------------
 
 -- ----------------------------
+-- Table structure for account_session_versions
+-- ----------------------------
+DROP TABLE IF EXISTS `account_session_versions`;
+CREATE TABLE `account_session_versions` (
+  `account_id` int(11) NOT NULL,
+  `version` char(64) NOT NULL COMMENT 'Random session revocation version',
+  PRIMARY KEY (`account_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8 COLLATE=utf8_unicode_ci;
+
+-- ----------------------------
 -- Table structure for acl_account_groups
 -- ----------------------------
 DROP TABLE IF EXISTS `acl_account_groups`;

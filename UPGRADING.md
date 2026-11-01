@@ -11,7 +11,9 @@ This guide covers the `9.5.2` release of [MMO-Coin/FusionCMS](https://github.com
 
 The version check uses upstream PHP version numbers. It does not recognize distribution backports or detect Windows package rebuilds.
 
-Changes on `main` after `9.5.2` also expire password reset links after one hour and harden remembered logins. Logout and password recovery revoke every remembered device for that account. Legacy `fcms_password` cookies no longer sign users in; affected users must enter their password again. These changes use the existing tables and need no additional SQL migration. Other browsers' active PHP sessions are not revoked by these remember-me changes.
+Changes on `main` after `9.5.2` expire password reset links after one hour and harden remembered logins. Logout and password recovery revoke every remembered device for that account. Password recovery also revokes all active PHP sessions, even when the same password is chosen. Each browser loses access on its next request and must sign in again. Legacy `fcms_password` cookies no longer sign users in; affected users must enter their password again.
+
+Before deploying `main` to an existing site, run `application/modules/install/SQL/updates/2026_11_01_01_account_session_versions.sql` against the **website database**. The script adds the account revocation table and can be rerun without changing existing records. Fresh installations already include it. Keep this table when clearing session storage or caches; deleting its records can revalidate older sessions. Back it up with the website database.
 
 PHP's cURL runtime must have a working CA trust store for the configured HTTPS RPC provider. Configure `curl.cainfo` when your PHP distribution does not provide one. Keep TLS certificate verification enabled.
 

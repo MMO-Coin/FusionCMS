@@ -97,6 +97,12 @@ jobs:
         FUSION_TEST_MYSQL_PASSWORD: fusion_test
       run: php tests/remember_me_test.php
 
+    - name: Run account session revocation and migration regressions
+      env:
+        FUSION_TEST_MYSQL_HOST: 127.0.0.1
+        FUSION_TEST_MYSQL_PASSWORD: fusion_test
+      run: php tests/account_session_test.php
+
     - name: Run donation frontend regression tests
       run: node tests/donation_frontend_test.cjs
 

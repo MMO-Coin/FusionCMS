@@ -57,7 +57,7 @@ function assertOwner(mysqli $db, string $database, string $nonce): void {
 }
 function resetFixture(mysqli $db, array $config): void {
     $db->select_db($config['cms']);
-    foreach (['donate_mmo_transactions', 'monthly_income', 'failed_logins', 'remember_me_tokens', 'password_recovery_key', 'email_log'] as $table) $db->query("DELETE FROM `$table`");
+    foreach (['donate_mmo_transactions', 'monthly_income', 'failed_logins', 'remember_me_tokens', 'password_recovery_key', 'email_log', 'account_session_versions'] as $table) $db->query("DELETE FROM `$table`");
     $db->query('UPDATE account_data SET dp = 0, vp = 0');
     $db->select_db($config['auth']);
     $db->query("UPDATE account SET sha_pass_hash = UPPER(SHA1(CONCAT(username, ':BROWSERTEST123')))");

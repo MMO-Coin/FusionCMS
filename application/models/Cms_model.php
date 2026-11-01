@@ -350,14 +350,16 @@ class Cms_model extends CI_Model
      * Issue a new remember-me token for the given account.
      *
      * @param int $accountId
+     * @param string|null $expectedSessionVersion Version captured when the account signed in.
      * @return string The raw token to set in the cookie (never stored as-is).
      */
-    public function issueRememberMeToken(int $accountId): string
+    public function issueRememberMeToken(int $accountId, ?string $expectedSessionVersion = null): string
     {
         $lifetime = (int) $this->config->item('cookie_expire');
         if ($accountId <= 0 || $lifetime <= 0) {
             throw new InvalidArgumentException('Invalid remembered-login account or lifetime.');
         }
+        $sessionVersion = $expectedSessionVersion ?? $this->account_session_model->getVersion($accountId);
         // 64 bytes = 128 hex chars of randomness
         $rawToken = bin2hex(random_bytes(64));
         $tokenHash = hash('sha256', $rawToken);
@@ -369,6 +371,12 @@ class Cms_model extends CI_Model
             'created_at'  => date('Y-m-d H:i:s'),
         ]);
         if (!$inserted) throw new RuntimeException('Unable to store the remembered login.');
+        // Check after insertion so a reset that already deleted tokens cannot
+        // be followed by this request leaving a remembered login behind.
+        if (!hash_equals($sessionVersion, $this->account_session_model->getVersion($accountId))) {
+            $this->deleteRememberMeTokenByToken($rawToken);
+            throw new RuntimeException('Account sessions changed during sign-in. Please sign in again.');
+        }
 
         return $rawToken;
     }
@@ -380,7 +388,7 @@ class Cms_model extends CI_Model
      * account-wide revocation cannot miss a replacement inserted later.
      *
      * @param string $rawToken
-     * @return array|false  ['account_id' => int, 'new_token' => string] or false
+     * @return array|false Account ID, successor token and captured session version, or false.
      */
     public function validateRememberMeToken(string $rawToken): array|false
     {
@@ -388,6 +396,7 @@ class Cms_model extends CI_Model
         $tokenHash = hash('sha256', $rawToken);
         $row = $this->findRememberMeToken($tokenHash);
         if (!$row) return false;
+        $sessionVersion = $this->account_session_model->getVersion((int) $row['account_id']);
         $now = time();
         $expires = strtotime($row['expires_at']);
         if ($expires === false || $expires <= $now || (int) $row['account_id'] <= 0) {
@@ -405,6 +414,7 @@ class Cms_model extends CI_Model
         return [
             'account_id' => (int) $row['account_id'],
             'new_token'  => $newRawToken,
+            'session_version' => $sessionVersion,
         ];
     }
 

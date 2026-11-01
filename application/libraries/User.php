@@ -41,6 +41,7 @@ class User
     {
         //Get the instance of the CI
         $this->CI = &get_instance();
+        $this->CI->load->model('account_session_model');
 
         //Set the default user values;
         $this->getUserData();
@@ -73,13 +74,20 @@ class User
      *
      * @param string $username
      * @param string $password
+     * @param string|null $expectedSessionVersion Version captured by remember-me validation.
      * @return int
      */
-    public function setUserDetails(string $username, string $password): int
+    public function setUserDetails(string $username, string $password, ?string $expectedSessionVersion = null): int
     {
+        // Capture the version before checking credentials so an overlapping reset
+        // cannot give a login authenticated with the old password a new version.
+        $accountId = (int) $this->CI->external_account_model->getId(strtoupper($username));
+        if ($accountId <= 0) return 1;
+        $sessionVersion = $this->CI->account_session_model->getVersion($accountId);
+        if ($expectedSessionVersion !== null && !hash_equals($sessionVersion, $expectedSessionVersion)) return 2;
         $check = $this->CI->external_account_model->initialize(strtoupper($username));
 
-        if (!$check) {
+        if (!$check || $this->CI->external_account_model->getId() !== $accountId) {
             return 1;
         } elseif (hash_equals(strtoupper($this->CI->external_account_model->getPassword()), strtoupper($password))) {
             // Load the internal values (vp, dp etc.)
@@ -92,6 +100,7 @@ class User
                 'email' => $this->CI->external_account_model->getEmail(),
                 'expansion' => $this->CI->external_account_model->getExpansion(),
                 'online' => true,
+                'auth_session_version' => $sessionVersion,
                 'register_date' => preg_replace("/\s.*/", "", $this->CI->external_account_model->getJoinDate()),
                 'last_ip' => $this->CI->external_account_model->getLastIp(),
                 'nickname' => $this->CI->internal_user_model->getNickname(),
@@ -107,7 +116,7 @@ class User
             // Reload this object.
             $this->getUserData();
 
-            return 0;
+            return $this->isOnline() ? 0 : 2;
         } else {
             //Return an error
             return 2;
@@ -254,6 +263,21 @@ class User
 
     public function getUserData(): void
     {
+        $session = Services::session();
+        if ($session->get('online')) {
+            $accountId = (int) $session->get('uid');
+            $storedVersion = $session->get('auth_session_version') ?? '';
+            $currentVersion = $this->CI->account_session_model->getVersion($accountId);
+            if ($accountId <= 0 || !is_string($storedVersion) || !hash_equals($currentVersion, $storedVersion)) {
+                // Remove authentication and 2FA state before any model or controller
+                // uses this session. Rotate the ID and delete its old storage entry.
+                $_SESSION = [];
+                $session->regenerate(true);
+                foreach (['fcms_username', 'fcms_token', 'fcms_password'] as $name) {
+                    $this->CI->input->set_cookie($name, '');
+                }
+            }
+        }
         // If they are logged in sync the settings with our object
         if (Services::session()->get('online')) {
             $this->id = Services::session()->get('uid');

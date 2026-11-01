@@ -111,8 +111,17 @@ test('password recovery revokes all remembered devices without affecting another
         const recoveryPage = await recovery.newPage();
         const link = await requestLink(recoveryPage, baseURL);
         await openPage(recoveryPage, link.href);
+        expect((await reset(recoveryPage, 'short')).error).toBeTruthy();
+        await allowed(page);
+        await allowed(second.pages()[0]);
+        const oldSession = (await context.cookies()).filter(cookie => cookie.name === 'fusion_session');
         expect((await reset(recoveryPage, 'ChangedTest123')).success).toBeTruthy();
         expect(remembered().map(row => row.account_id)).toEqual(['2']);
+        // Keep the original session cookies: these are active sessions, not restorations.
+        await denied(page);
+        await denied(second.pages()[0]);
+        await allowed(other.pages()[0]);
+        await replay(browser, baseURL, oldSession);
         await replay(browser, baseURL, first);
         await replay(browser, baseURL, secondCookies);
         await replay(browser, baseURL, otherCookies, true);

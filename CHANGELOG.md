@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Invalidate all active PHP sessions after password recovery, including a reset to the same password. Check an account revocation version before authenticated requests, clear stale authentication and 2FA state, and prevent stale login or remember-me claims from receiving the new version. Existing sites must run `2026_11_01_01_account_session_versions.sql` before deploying these files.
+- Add desktop and mobile checks for active-session revocation, stale session-ID replay, rejected checkout writes, fresh login and isolation between accounts. Add session-version, overlapping-login, transaction rollback and migration regressions.
 - Rotate remember-me tokens with an atomic update to the existing row. Reject expired and reused tokens, clear invalid cookies, and revoke all remembered devices for the account on logout or password recovery. Retire legacy password-hash cookies; users with that old format must sign in again. No schema migration is needed.
 - Add desktop and mobile remember-me browser coverage and concurrent MySQL checks for rotation, expiry and account revocation.
 - Expire password reset links after one hour and atomically consume each valid token before changing the password, preventing sequential and concurrent reuse. No schema migration is needed. Escape reset-token form values and remove recovery request logging from the browser console.

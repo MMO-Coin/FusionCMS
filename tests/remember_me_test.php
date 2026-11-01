@@ -9,9 +9,10 @@ namespace {
     define('CI_DEBUG', false);
     function log_message(...$arguments) {}
     function config(...$arguments) { return (object) ['limitZeroAsAll' => true]; }
-    class CI_Model { public $db; public $config; }
+    class CI_Model { public $db; public $config; public $account_session_model; }
     require __DIR__ . '/../vendor/autoload.php';
     require __DIR__ . '/../application/models/Cms_model.php';
+    require __DIR__ . '/../application/models/Account_session_model.php';
 
     function check(bool $condition, string $message): void {
         if (!$condition) throw new \RuntimeException($message);
@@ -20,6 +21,8 @@ namespace {
     function model($db, string $class = \Cms_model::class): \Cms_model {
         $model = (new \ReflectionClass($class))->newInstanceWithoutConstructor();
         $model->db = $db;
+        $model->account_session_model = new \Account_session_model();
+        $model->account_session_model->db = $db;
         $model->config = new class {
             public function item($key) { return $key === 'cookie_expire' ? 2592000 : null; }
         };
@@ -84,6 +87,7 @@ namespace {
     $columns = ' (account_id INT NOT NULL, token_hash VARCHAR(64) NOT NULL, expires_at DATETIME NOT NULL, created_at DATETIME NOT NULL)';
     $db = new \CodeIgniter\Database\SQLite3\Connection(['database' => ':memory:', 'DBDebug' => true]);
     $db->query('CREATE TABLE remember_me_tokens' . str_replace(' (', ' (id INTEGER PRIMARY KEY AUTOINCREMENT, ', $columns));
+    $db->query('CREATE TABLE account_session_versions (account_id INT PRIMARY KEY, version CHAR(64) NOT NULL)');
     $remember = model($db);
     $raw = $remember->issueRememberMeToken(1);
     $row = $db->table('remember_me_tokens')->get()->getRowArray();
@@ -114,6 +118,19 @@ namespace {
     $remember->deleteRememberMeTokenByAccount(1);
     check($db->table('remember_me_tokens')->where('account_id', 1)->countAllResults() === 0
         && $remember->validateRememberMeToken($other) !== false, 'Account revocation removes rotated tokens and preserves other accounts.');
+    $oldVersion = $remember->account_session_model->getVersion(1);
+    $remember->account_session_model->invalidate(1);
+    $rejected = false;
+    try { $remember->issueRememberMeToken(1, $oldVersion); } catch (\RuntimeException $expected) { $rejected = true; }
+    check($rejected && $db->table('remember_me_tokens')->where('account_id', 1)->countAllResults() === 0,
+        'A sign-in completed before reset cannot issue a remembered login afterward.');
+    $db->query("CREATE TRIGGER reset_during_issue AFTER INSERT ON remember_me_tokens BEGIN UPDATE account_session_versions SET version = '"
+        . str_repeat('b', 64) . "' WHERE account_id = NEW.account_id; END");
+    $rejected = false;
+    try { $remember->issueRememberMeToken(1); } catch (\RuntimeException $expected) { $rejected = true; }
+    check($rejected && $db->table('remember_me_tokens')->where('account_id', 1)->countAllResults() === 0,
+        'A reset overlapping token insertion cannot leave a new remembered login.');
+    $db->query('DROP TRIGGER reset_during_issue');
     $expired = $remember->issueRememberMeToken(3);
     $db->table('remember_me_tokens')->where('token_hash', hash('sha256', $expired))->update(['expires_at' => date('Y-m-d H:i:s')]);
     $remember->purgeRememberMeTokenExpired();
@@ -127,6 +144,7 @@ namespace {
     $db = mysql($prefix);
     $db->query('CREATE TABLE ' . $prefix . 'remember_me_tokens'
         . str_replace(' (', ' (id INT AUTO_INCREMENT PRIMARY KEY, ', $columns) . ' ENGINE=InnoDB');
+    $db->query('CREATE TABLE ' . $prefix . 'account_session_versions (account_id INT PRIMARY KEY, version CHAR(64) NOT NULL) ENGINE=InnoDB');
     $barrier = sys_get_temp_dir() . '/fusion-remember-race-' . bin2hex(random_bytes(8));
     mkdir($barrier, 0700);
     $workers = [];
@@ -166,6 +184,7 @@ namespace {
             if (is_resource($process)) { proc_terminate($process); proc_close($process); }
         }
         $db->query('DROP TABLE ' . $prefix . 'remember_me_tokens');
+        $db->query('DROP TABLE ' . $prefix . 'account_session_versions');
         foreach (glob($barrier . '/*.ready') as $file) unlink($file);
         if (is_file($barrier . '/release')) unlink($barrier . '/release');
         rmdir($barrier);

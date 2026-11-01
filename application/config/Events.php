@@ -120,7 +120,7 @@ Events::on('pre_controller', static function () {
                 $accountRow = CI::$APP->external_account_model->getInfo($tokenResult['account_id']);
                 if($accountRow)
                 {
-                    $user = CI::$APP->user->setUserDetails($accountRow['username'], $accountRow['verifier'] ?? strtoupper($accountRow['sha_pass_hash']));
+                    $user = CI::$APP->user->setUserDetails($accountRow['username'], $accountRow['verifier'] ?? strtoupper($accountRow['sha_pass_hash']), $tokenResult['session_version']);
 
                     if($user === 0)
                     {
