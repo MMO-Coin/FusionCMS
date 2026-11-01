@@ -74,10 +74,12 @@ its ease of use and development, safe and secure codebase and dedication to simp
 
 ### Download
 
-[Latest release](https://github.com/FusionWowCMS/FusionCMS/releases/latest)
+[Releases for this fork](https://github.com/MMO-Coin/FusionCMS/releases)
 
 ### Installation
 Read the [Installation Guide](https://github.com/FusionWowCMS/FusionCMS/wiki/Installation-Guide).
+
+For this fork's existing-site migrations and rollback steps, read [UPGRADING.md](../UPGRADING.md). Changes are listed in the [changelog](../CHANGELOG.md).
 
 ### Prerequisites
 

@@ -1,4 +1,6 @@
 <section class="box big">
+    <input type="hidden" id="mmo-admin-csrf-name" value="{$csrf_name|escape}">
+    <input type="hidden" id="mmo-admin-csrf-hash" value="{$csrf_hash|escape}">
     <h2>MMOCoin Donation Packages</h2>
     
     <table class="table">

@@ -4,6 +4,7 @@
     </div>
 
     <form method="post" action="{$url}donate_mmo/checkout">
+        <input type="hidden" name="{$csrf_name|escape}" value="{$csrf_hash|escape}">
         {if $packages}
             <ul class="donation-packages">
             {foreach from=$packages item=p}
@@ -25,7 +26,7 @@
     
     <div style="margin-top: 40px; padding: 20px; background: rgba(0,0,0,0.2); border-left: 4px solid #f39c12; border-radius: 4px;">
         <h3 style="margin-top: 0; color: #f39c12;">How to get MMOCoin Token?</h3>
-        <p>Before you can donate, you need **MMOCoin** tokens on the Solana blockchain.</p>
+        <p>Before you can donate, you need <strong>MMOCoin</strong> tokens on the Solana blockchain.</p>
         <ol style="margin-left: 20px; margin-top: 10px; line-height: 1.6;">
             <li>Download the <a href="https://phantom.app/" target="_blank" style="color: #61dafb; text-decoration: underline;">Phantom Wallet</a> app on your phone or browser.</li>
             <li>Send some SOL (Solana) to your Phantom wallet to cover network fees.</li>

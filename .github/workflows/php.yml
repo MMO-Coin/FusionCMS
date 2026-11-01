@@ -1,9 +1,7 @@
 name: PHP Composer
 
-env:
-  PHP_VERSION: '8.3.36'
-
 on:
+  workflow_dispatch:
   push:
     branches: [ "main" ]
   pull_request:
@@ -14,8 +12,26 @@ permissions:
 
 jobs:
   build:
-
+    name: PHP ${{ matrix.php }}
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        php: ['8.3.36', '8.4.27', '8.5.12']
+    services:
+      mysql:
+        image: mysql:8.0
+        env:
+          MYSQL_ROOT_PASSWORD: fusion_test
+          MYSQL_DATABASE: fusion_test
+          MYSQL_ROOT_HOST: '%'
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping -h localhost -pfusion_test"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=10
 
     steps:
     - uses: actions/checkout@v7
@@ -23,7 +39,9 @@ jobs:
     - name: Setup PHP
       uses: shivammathur/setup-php@v2
       with:
-          php-version: ${{ env.PHP_VERSION }}
+          php-version: ${{ matrix.php }}
+          extensions: mysqli, gmp, gd, intl, soap, zip, mbstring, sqlite3
+          tools: composer:v2
 
     - name: Validate composer.json and composer.lock
       run: composer validate --strict
@@ -36,9 +54,9 @@ jobs:
       uses: actions/cache@v6
       with:
         path: vendor
-        key: ${{ runner.os }}-php-${{ hashFiles('**/composer.lock') }}
+        key: ${{ runner.os }}-php-${{ matrix.php }}-${{ hashFiles('**/composer.lock') }}
         restore-keys: |
-          ${{ runner.os }}-php-
+          ${{ runner.os }}-php-${{ matrix.php }}-
 
     - name: Install dependencies
       run: composer install --prefer-dist --no-progress
@@ -48,3 +66,15 @@ jobs:
 
     - name: Run PHP requirement regression tests
       run: php tests/php_requirements_test.php
+
+    - name: Run donation security and schema regression tests
+      env:
+        FUSION_TEST_MYSQL_HOST: 127.0.0.1
+        FUSION_TEST_MYSQL_PASSWORD: fusion_test
+      run: php tests/donation_security_test.php
+
+    - name: Run donation request regression tests
+      run: php tests/donation_controller_test.php
+
+    - name: Run donation frontend regression tests
+      run: node tests/donation_frontend_test.cjs

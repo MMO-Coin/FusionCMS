@@ -1,78 +1,45 @@
 var Admin = {
-    add: function(form) {
-        var price = $(form).find('#price').val();
-        var points = $(form).find('#points').val();
-
-        $.post(Config.URL + "donate_mmo/admin/add", {
-            price: price,
-            points: points,
-            csrf_token_name: Config.CSRF
-        }, function(data) {
-            if(data == 'SUCCESS') {
+    post: async function (action, fields) {
+        const token = document.getElementById('mmo-admin-csrf-hash');
+        const body = new URLSearchParams(fields);
+        body.set(document.getElementById('mmo-admin-csrf-name').value, token.value);
+        try {
+            const response = await fetch(Config.URL + 'donate_mmo/admin/' + action, {
+                method: 'POST', credentials: 'same-origin',
+                headers: {'X-Requested-With': 'XMLHttpRequest'}, body: body,
+            });
+            const renewed = response.headers.get('X-CSRF-Token');
+            if (renewed) token.value = renewed;
+            const text = await response.text();
+            if (response.ok && text === 'SUCCESS') {
                 window.location.reload();
             } else {
-                Swal.fire({
-                    title: "Error",
-                    text: data,
-                    icon: "error"
-                });
+                Swal.fire({title: 'Unable to save package', text: response.ok ? text : 'Reload this page and try again.', icon: 'error'});
             }
-        });
+        } catch (error) {
+            Swal.fire({title: 'Connection failed', text: 'Please try again.', icon: 'error'});
+        }
     },
-
-    edit: function(id, current_price, current_points) {
-        Swal.fire({
-            title: 'Edit Package',
-            html:
-                '<input id="swal-price" class="swal2-input" placeholder="MMO Amount" value="' + current_price + '">' +
-                '<input id="swal-points" class="swal2-input" placeholder="Donation Points" value="' + current_points + '">',
-            focusConfirm: false,
-            preConfirm: () => {
-                return [
-                    document.getElementById('swal-price').value,
-                    document.getElementById('swal-points').value
-                ]
-            }
-        }).then((result) => {
-            if (result.value) {
-                $.post(Config.URL + "donate_mmo/admin/edit", {
-                    id: id,
-                    price: result.value[0],
-                    points: result.value[1],
-                    csrf_token_name: Config.CSRF
-                }, function(data) {
-                    if(data == 'SUCCESS') {
-                        window.location.reload();
-                    } else {
-                        Swal.fire("Error", data, "error");
-                    }
-                });
-            }
-        });
+    add: function (form) {
+        return Admin.post('add', {price: form.elements.price.value, points: form.elements.points.value});
     },
-
-    delete: function(id) {
+    edit: function (id, price, points) {
         Swal.fire({
-            title: 'Delete Package',
-            text: "Are you sure you want to delete this donation package?",
-            icon: 'warning',
-            showCancelButton: true,
-            confirmButtonColor: '#3085d6',
-            cancelButtonColor: '#d33',
-            confirmButtonText: 'Yes, delete it!'
-        }).then((result) => {
-            if (result.value) {
-                $.post(Config.URL + "donate_mmo/admin/delete", {
-                    id: id,
-                    csrf_token_name: Config.CSRF
-                }, function(data) {
-                    if(data == 'SUCCESS') {
-                        window.location.reload();
-                    } else {
-                        Swal.fire("Error", data, "error");
-                    }
-                });
-            }
-        });
-    }
+            title: 'Edit package',
+            html: '<input id="swal-price" class="swal2-input" placeholder="MMOCoin amount">' +
+                '<input id="swal-points" class="swal2-input" placeholder="Donation points">',
+            didOpen: function () {
+                document.getElementById('swal-price').value = price;
+                document.getElementById('swal-points').value = points;
+            },
+            preConfirm: function () {
+                return {id: id, price: document.getElementById('swal-price').value, points: document.getElementById('swal-points').value};
+            },
+        }).then(function (result) { if (result.isConfirmed) Admin.post('edit', result.value); });
+    },
+    delete: function (id) {
+        Swal.fire({title: 'Delete package?', text: 'Existing invoices keep their original amount and points.',
+            icon: 'warning', showCancelButton: true, confirmButtonText: 'Delete',
+        }).then(function (result) { if (result.isConfirmed) Admin.post('delete', {id: id}); });
+    },
 };

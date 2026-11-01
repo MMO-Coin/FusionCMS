@@ -2,6 +2,14 @@
     "name": "Donate MMOCoin",
     "description": "Donation Gateway for MMOCoin using Solana Pay",
     "author": "MMOCoin.pro",
-    "version": "1.0",
+    "version": "1.1.0",
+    "permissions": {
+        "view": {"default": true, "description": "View MMOCoin donation packages and verify your own invoices."},
+        "viewAdmin": {"default": false, "description": "View MMOCoin donation administration."},
+        "addDonationPackages": {"default": false, "description": "Add MMOCoin donation packages."},
+        "editDonationPackages": {"default": false, "description": "Edit MMOCoin donation packages."},
+        "deleteDonationPackages": {"default": false, "description": "Delete MMOCoin donation packages."}
+    },
+    "admin": [{"text": "Store", "icon": "share", "links": [{"text": "MMOCoin packages", "icon": "coins", "controller": "admin", "requirePermission": "viewAdmin"}]}],
     "enabled": true
 }

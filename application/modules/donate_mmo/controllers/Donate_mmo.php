@@ -1,6 +1,9 @@
 <?php
 
+use App\Config\Services;
 use MX\MX_Controller;
+
+require_once __DIR__ . '/../libraries/SolanaPaymentVerifier.php';
 
 class Donate_mmo extends MX_Controller
 {
@@ -12,7 +15,6 @@ class Donate_mmo extends MX_Controller
 
         $this->load->config('donate_mmo');
         $this->load->model('mmocoin_model');
-        $this->load->model('donate/donate_model', 'donate_core');
     }
 
     public function index()
@@ -24,7 +26,9 @@ class Donate_mmo extends MX_Controller
         $data = [
             'packages' => $this->mmocoin_model->getPackages(),
             'server_name' => $this->config->item('server_name'),
-            'currency' => "MMO"
+            'currency' => 'MMO',
+            'csrf_name' => $this->security->get_csrf_token_name(),
+            'csrf_hash' => $this->security->get_csrf_hash(),
         ];
 
         $output = $this->template->loadPage("index.tpl", $data);
@@ -40,152 +44,143 @@ class Donate_mmo extends MX_Controller
 
         $page = $this->template->loadPage("page.tpl", $pageData);
 
-        $this->template->view($page, "modules/donate_mmo/css/donate_mmo.css", "modules/donate_mmo/js/donate_mmo.js");
+        $this->template->view($page);
     }
 
-    public function checkout($package_id)
+    public function checkout($package_id = null)
     {
         requirePermission("view");
-
-        $package = $this->mmocoin_model->getPackage($package_id);
-        if(!$package) {
-            redirect(base_url('/donate_mmo'));
+        if (strtoupper($_SERVER['REQUEST_METHOD'] ?? '') !== 'POST') {
+            show_error('Use the donation package form to create an invoice.', 405);
             return;
         }
-
-        // Generate a new keypair to use as a unique reference
-        // Note: For reference purposes, any random 32-byte public key string base58 encoded works.
-        // PHP lacks native Ed25519 without sodium. We will generate a secure random string and base58 encode it.
+        $packageId = filter_var($package_id ?? $this->input->post('package_id'), FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]);
+        $package = $packageId ? $this->mmocoin_model->getPackage($packageId) : false;
+        if (!$package) {
+            show_error('Donation package not found.', 404);
+            return;
+        }
+        $merchant = (string) $this->config->item('merchant_wallet');
+        $mint = (string) $this->config->item('mmo_coin_mint');
+        try {
+            $amount = SolanaPaymentVerifier::amount((string) $package['price']);
+            $points = filter_var($package['points'], FILTER_VALIDATE_INT, ['options' => ['min_range' => 1, 'max_range' => 2147483647]]);
+            $income = SolanaPaymentVerifier::income($amount, (string) $this->config->item('exchange_rate'));
+            if (!$points || !SolanaPaymentVerifier::validAddress($merchant) || !SolanaPaymentVerifier::validAddress($mint)) {
+                throw new InvalidArgumentException('Invalid donation configuration.');
+            }
+        } catch (InvalidArgumentException $e) {
+            show_error('MMOCoin donations are not configured correctly. Please contact the server administrator.', 503);
+            return;
+        }
         $reference = $this->generateBase58Reference();
-
-        // Create pending transaction in DB
-        $user_id = $this->user->getId();
-        $this->mmocoin_model->createTransaction($user_id, $package['price'], $package['points'], $reference);
-
-        // Merchant and mint details from config
-        $merchant = $this->config->item('merchant_wallet');
-        $mint = $this->config->item('mmo_coin_mint');
-        $amount = $package['price'];
-
-        // Construct standard Solana Pay URL
-        // solana:<recipient>?amount=<amount>&spl-token=<mint>&reference=<reference>&label=<label>&message=<message>
-        $solana_pay_url = "solana:{$merchant}?amount={$amount}&spl-token={$mint}&reference={$reference}&label=" . urlencode($this->config->item('server_name')) . "&message=Donation";
-
-        $data = [
-            'package' => $package,
-            'reference' => $reference,
-            'merchant' => $merchant,
-            'solana_pay_url' => $solana_pay_url,
-            'expires_at' => time() + 3600 // 60 minutes from now
-        ];
-
-        $output = $this->template->loadPage("checkout.tpl", $data);
-
-        $pageData = [
-            "module" => "default",
-            "headline" => breadcrumb([
-                "ucp" => lang("ucp"),
-                "donate" => lang("donate_panel", "donate")
-            ]),
-            "content" => $output
-        ];
-
-        $page = $this->template->loadPage("page.tpl", $pageData);
-        $this->template->view($page, "modules/donate_mmo/css/checkout.css", "modules/donate_mmo/js/checkout.js");
+        $userId = (int) $this->user->getId();
+        if (!$this->mmocoin_model->createTransaction($userId, $amount, $points, $reference, $merchant, $mint, $income)) {
+            show_error('Unable to create a donation invoice. Please try again.', 503);
+            return;
+        }
+        $invoice = $this->mmocoin_model->getTransaction($reference, $userId);
+        $package['price'] = $amount;
+        $solanaPayUrl = 'solana:' . $merchant . '?' . http_build_query([
+            'amount' => $amount, 'spl-token' => $mint, 'reference' => $reference,
+            'label' => $this->config->item('server_name'), 'message' => 'Donation',
+        ], '', '&', PHP_QUERY_RFC3986);
+        $output = $this->template->loadPage('checkout.tpl', [
+            'package' => $package, 'reference' => $reference, 'merchant' => $merchant,
+            'solana_pay_url' => $solanaPayUrl, 'expires_at' => strtotime($invoice['expires_at'] . ' UTC'),
+            'qr_code' => (new \chillerlan\QRCode\QRCode())->render($solanaPayUrl),
+            'csrf_name' => $this->security->get_csrf_token_name(), 'csrf_hash' => $this->security->get_csrf_hash(),
+        ]);
+        $page = $this->template->loadPage('page.tpl', [
+            'module' => 'default', 'headline' => breadcrumb(['ucp' => lang('ucp'), 'donate' => lang('donate_panel', 'donate')]),
+            'content' => $output,
+        ]);
+        $this->template->view($page, false, 'modules/donate_mmo/js/checkout.js');
     }
 
-    public function verify_payment($reference)
+    public function verify_payment($reference = '')
     {
-        // Must be an AJAX POST request usually, or checking from frontend
-        $transaction = $this->mmocoin_model->getPendingTransaction($reference);
-        
-        if(!$transaction) {
-            echo json_encode(['status' => 'error', 'message' => 'Transaction not found or already processed']);
+        requirePermission('view');
+        header('Content-Type: application/json');
+        header('Cache-Control: no-store');
+        if (strtoupper($_SERVER['REQUEST_METHOD'] ?? '') !== 'POST') {
+            http_response_code(405);
+            $this->paymentResponse(['status' => 'error', 'message' => 'Use POST to check payment status.']);
             return;
         }
-
-        // Check if invoice has expired (60 minutes)
-        if(time() - strtotime($transaction['created_at']) > 3600) {
-            $this->mmocoin_model->updateTransactionStatus($reference, 'failed');
-            echo json_encode(['status' => 'error', 'message' => 'Invoice has expired']);
+        $userId = (int) $this->user->getId();
+        $invoice = SolanaPaymentVerifier::validAddress((string) $reference) ? $this->mmocoin_model->getTransaction($reference, $userId) : false;
+        if (!$invoice) {
+            http_response_code(404);
+            $this->paymentResponse(['status' => 'error', 'message' => 'Invoice not found.']);
             return;
         }
-
-        $rpc_url = $this->config->item('rpc_url');
-
-        // Step 1: Query Solana RPC to get signatures for the reference address
-        $payload = [
-            "jsonrpc" => "2.0",
-            "id" => 1,
-            "method" => "getSignaturesForAddress",
-            "params" => [
-                $reference,
-                ["limit" => 1]
-            ]
-        ];
-
-        $ch = curl_init($rpc_url);
-        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-        curl_setopt($ch, CURLOPT_HTTPHEADER, ['Content-Type: application/json']);
-        curl_setopt($ch, CURLOPT_POST, true);
-        curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($payload));
-        
-        $response = curl_exec($ch);
-        curl_close($ch);
-
-        $result = json_decode($response, true);
-
-        if(isset($result['result']) && count($result['result']) > 0) {
-            $signature = $result['result'][0]['signature'];
-            
-            // Step 2: Fetch the parsed transaction details to verify amount and token
-            // A more robust implementation checks the pre/post token balances of the merchant address.
-            // But if Solana Pay is used, we assume finding a confirmed signature with the reference is 99% reliable.
-            // For production safety, we should verify the parsed transaction data.
-            
-            $tx_payload = [
-                "jsonrpc" => "2.0",
-                "id" => 1,
-                "method" => "getTransaction",
-                "params" => [
-                    $signature,
-                    ["encoding" => "jsonParsed", "maxSupportedTransactionVersion" => 0]
-                ]
-            ];
-
-            $ch2 = curl_init($rpc_url);
-            curl_setopt($ch2, CURLOPT_RETURNTRANSFER, true);
-            curl_setopt($ch2, CURLOPT_HTTPHEADER, ['Content-Type: application/json']);
-            curl_setopt($ch2, CURLOPT_POST, true);
-            curl_setopt($ch2, CURLOPT_POSTFIELDS, json_encode($tx_payload));
-            
-            $tx_response = curl_exec($ch2);
-            curl_close($ch2);
-            
-            $tx_result = json_decode($tx_response, true);
-            
-            // Basic verification logic:
-            // Ensure the transaction succeeded
-            if (isset($tx_result['result']['meta']['err']) && $tx_result['result']['meta']['err'] === null) {
-                // Determine if it was MMO token and matched amount...
-                // *For simplicity in this scaffold MVP, finding the signature on the reference key without errors is deemed successful.* 
-                // A wallet can only sign if it has the funds. The reference key is strictly tied to THIS exact transaction amount in the QR.
-
-                // Update DB status
-                $this->mmocoin_model->updateTransactionStatus($reference, 'completed', $signature);
-                
-                // Grant DP
-                $this->donate_core->giveDp($transaction['user_id'], $transaction['dp_amount']);
-
-                // Update monthly income stats
-                $this->donate_core->updateMonthlyIncome($transaction['mmo_amount'] * $this->config->item('exchange_rate'));
-
-                echo json_encode(['status' => 'success']);
-                return;
+        if ($invoice['status'] === 'completed') {
+            $this->paymentResponse(['status' => 'success']);
+            return;
+        }
+        if ($invoice['status'] !== 'pending' || empty($invoice['expires_at'])
+            || empty($invoice['merchant_wallet']) || empty($invoice['token_mint'])
+            || time() >= strtotime($invoice['expires_at'] . ' UTC')) {
+            $this->mmocoin_model->expireTransaction($reference, $userId);
+            $this->paymentResponse(['status' => 'error', 'message' => 'Invoice expired. Please create a new invoice.']);
+            return;
+        }
+        if (!Services::throttler()->check('donate_mmo_verify_' . $userId, 20, MINUTE)) {
+            http_response_code(429);
+            $this->paymentResponse(['status' => 'pending']);
+            return;
+        }
+        try {
+            $signatures = $this->rpc('getSignaturesForAddress', [$reference, ['limit' => 5, 'commitment' => 'finalized']]);
+            foreach (is_array($signatures) ? $signatures : [] as $candidate) {
+                $signature = $candidate['signature'] ?? '';
+                if (!is_string($signature) || !preg_match('/^[1-9A-HJ-NP-Za-km-z]{64,88}$/D', $signature)
+                    || !array_key_exists('err', $candidate) || $candidate['err'] !== null
+                    || ($candidate['confirmationStatus'] ?? '') !== 'finalized') {
+                    continue;
+                }
+                $tx = $this->rpc('getTransaction', [$signature, [
+                    'encoding' => 'jsonParsed', 'maxSupportedTransactionVersion' => 0, 'commitment' => 'finalized',
+                ]]);
+                if (is_array($tx) && SolanaPaymentVerifier::verifies($tx, $invoice, $signature)
+                    && $this->mmocoin_model->completeTransaction($reference, $userId, $signature)) {
+                    $this->paymentResponse(['status' => 'success']);
+                    return;
+                }
             }
+        } catch (RuntimeException $e) {
+            // An unavailable or malformed RPC response never grants points.
         }
+        $this->paymentResponse(['status' => 'pending']);
+    }
 
-        echo json_encode(['status' => 'pending']);
+    protected function rpc(string $method, array $params): mixed
+    {
+        $url = (string) $this->config->item('rpc_url');
+        if (strtolower((string) parse_url($url, PHP_URL_SCHEME)) !== 'https') {
+            throw new RuntimeException('The RPC endpoint must use HTTPS.');
+        }
+        $handle = curl_init($url);
+        curl_setopt_array($handle, [
+            CURLOPT_RETURNTRANSFER => true, CURLOPT_HTTPHEADER => ['Content-Type: application/json'],
+            CURLOPT_POST => true, CURLOPT_CONNECTTIMEOUT => 2, CURLOPT_TIMEOUT => 5,
+            CURLOPT_PROTOCOLS => CURLPROTO_HTTPS, CURLOPT_FOLLOWLOCATION => false,
+            CURLOPT_POSTFIELDS => json_encode(['jsonrpc' => '2.0', 'id' => 1, 'method' => $method, 'params' => $params]),
+        ]);
+        $body = curl_exec($handle);
+        $status = curl_getinfo($handle, CURLINFO_RESPONSE_CODE);
+        $response = is_string($body) ? json_decode($body, true) : null;
+        if ($status !== 200 || !is_array($response) || isset($response['error']) || !array_key_exists('result', $response)) {
+            throw new RuntimeException('The RPC response is unavailable.');
+        }
+        return $response['result'];
+    }
+
+    private function paymentResponse(array $response): void
+    {
+        $response['csrf_hash'] = $this->security->get_csrf_hash();
+        echo json_encode($response);
     }
 
     public function success()
