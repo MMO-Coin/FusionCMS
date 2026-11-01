@@ -106,6 +106,12 @@ jobs:
     - name: Run donation frontend regression tests
       run: node tests/donation_frontend_test.cjs
 
+    - name: Run TOTP vectors, replay protection and concurrent claims
+      env:
+        FUSION_TEST_MYSQL_HOST: 127.0.0.1
+        FUSION_TEST_MYSQL_PASSWORD: fusion_test
+      run: php tests/totp_test.php
+
     - name: Setup Node.js for browser tests
       uses: actions/setup-node@v6
       with:

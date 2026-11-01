@@ -60,6 +60,7 @@ namespace {
         public bool $destroyed = false;
         public function get($key) { return $_SESSION[$key] ?? null; }
         public function set(array $values) { $_SESSION = array_merge($_SESSION, $values); }
+        public function remove($keys) { foreach ((array) $keys as $key) unset($_SESSION[$key]); }
         public function regenerate($destroy = false) { $this->destroyed = $destroy; }
     };
     $ci = (object) [

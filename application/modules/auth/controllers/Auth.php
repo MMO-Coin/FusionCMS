@@ -242,6 +242,7 @@ class Auth extends MX_Controller
     //Two-Factor page
     public function security()
     {
+        $this->user->userArea();
         if ($this->external_account_model->getTotpSecret() == null || ($this->user->getTotpSecret() == $this->external_account_model->getTotpSecret())) {
             redirect($this->template->page_url . "ucp");
         }
@@ -261,10 +262,10 @@ class Auth extends MX_Controller
     //Two-Factor page
     public function checkTotp()
     {
-        if (!$this->input->is_ajax_request())
-            exit('No direct script access allowed');
+        if ($this->input->method() !== 'post') show_error('Invalid request', 405);
+        $this->user->userArea();
 
-        if (!Services::throttler()->check('totp_login_' . (int) Services::session()->get('uid'), 5, MINUTE)) {
+        if (!Services::throttler()->check('totp_verify_' . $this->user->getId(), 5, MINUTE)) {
             $data = [
                 'status' => false,
                 'icon' => 'error',
@@ -278,11 +279,19 @@ class Auth extends MX_Controller
         $secret = $this->external_account_model->getTotpSecret();
 
         $googleObj = new GoogleAuthenticator();
-
-        $result = $googleObj->verifyCode($secret, $digit);
-
-        if ($result)
-            $this->user->setTotpSecret($secret); // save to session
+        $this->load->model('totp_model');
+        $step = $this->config->item('totp_secret') && is_string($digit)
+            ? $googleObj->matchingTimeStep($secret, $digit) : null;
+        $result = $step !== null && $this->totp_model->claim($this->user->getId(), $googleObj->storedSecretKey($secret), $step);
+        if ($result) {
+            $this->external_account_model->initialize($this->user->getUsername());
+            $result = hash_equals($secret, $this->external_account_model->getTotpSecret())
+                && hash_equals($this->account_session_model->getVersion($this->user->getId()), Services::session()->get('auth_session_version') ?? '');
+            if ($result) {
+                Services::session()->regenerate(true);
+                $this->user->setTotpSecret($secret);
+            }
+        }
 
         $data = [
             'status' => $result,

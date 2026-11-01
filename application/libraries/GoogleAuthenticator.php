@@ -14,14 +14,14 @@ class GoogleAuthenticator
 
     /**
      * Create new secret.
-     * 16 characters, randomly chosen from the allowed base32 characters.
+     * 32 characters by default, chosen from the allowed base32 characters.
      *
      * @param int $secretLength
      *
      * @return string
      * @throws Exception
      */
-    public function createSecret(int $secretLength = 16): string
+    public function createSecret(int $secretLength = 32): string
     {
         $validChars = $this->getBase32LookupTable();
 
@@ -58,23 +58,40 @@ class GoogleAuthenticator
     public function createTotpAes(string $secret): string
     {
         $secret = $this->Base32Decode($secret);
+        if ($secret === false || $secret === '') throw new InvalidArgumentException('Invalid authenticator secret.');
+        $key = $this->masterKey();
+        if ($key === null) return $secret;
+        // TrinityCore stores ciphertext followed by its 12-byte IV and tag.
+        $iv = random_bytes(12);
+        $encrypted = openssl_encrypt($secret, 'aes-128-gcm', $key, OPENSSL_RAW_DATA, $iv, $tag, '', 12);
+        if ($encrypted === false) throw new RuntimeException('Unable to encrypt the authenticator secret.');
+        return $encrypted . $iv . $tag;
+    }
 
-        $masterKey = $this->CI->config->item('TOTPMasterSecret');
-
-        $IV_SIZE_BYTES = 16;
-        $TAG_SIZE_BYTES = 16;
-        $tag = null;
-
-        if (strlen($secret) + $IV_SIZE_BYTES + $TAG_SIZE_BYTES > 128) {
-            die('no');
-            //die('The provided two-factor authentication secret is too long.');
+    private function masterKey(): ?string
+    {
+        $key = $this->CI->config->item('TOTPMasterSecret');
+        if ($key === null || $key === '' || $key === false) return null;
+        if (!is_string($key) || !preg_match('/^[a-f0-9]{1,32}$/iD', $key)) {
+            throw new RuntimeException('TOTPMasterSecret must be a hexadecimal 128-bit TrinityCore key.');
         }
+        // TrinityCore reads the configured hex integer into little-endian bytes.
+        return strrev(hex2bin(str_pad($key, 32, '0', STR_PAD_LEFT)));
+    }
 
-        if ($masterKey) {
-            $secret = openssl_encrypt($secret, 'aes-256-gcm', $masterKey, OPENSSL_RAW_DATA, random_bytes($IV_SIZE_BYTES), $tag);
+    public function storedSecretKey(string $secret): ?string
+    {
+        if ($secret === '' || strlen($secret) > 128) return null;
+        if ($this->CI->config->item('totp_secret_name') !== 'totp_secret') {
+            $key = $this->Base32Decode($secret);
+            return $key === false || $key === '' ? null : $key;
         }
-
-        return $secret;
+        $key = $this->masterKey();
+        if ($key === null) return $secret;
+        if (strlen($secret) <= 24) return null;
+        $decoded = openssl_decrypt(substr($secret, 0, -24), 'aes-128-gcm', $key, OPENSSL_RAW_DATA,
+            substr($secret, -24, 12), substr($secret, -12));
+        return $decoded === false || $decoded === '' ? null : $decoded;
     }
 
     /**
@@ -85,7 +102,7 @@ class GoogleAuthenticator
      *
      * @return string
      */
-    public function getCode(string $secret, int $timeSlice = null): string
+    public function getCode(string $secret, ?int $timeSlice = null): string
     {
         if ($timeSlice === null) {
             $timeSlice = floor(time() / 30);
@@ -135,7 +152,7 @@ class GoogleAuthenticator
     }
 
     /**
-     * Get QR-Code URL for image, from Google charts.
+     * Render a local authenticator enrollment QR code.
      *
      * @param string $name
      * @param string $secret
@@ -143,7 +160,7 @@ class GoogleAuthenticator
      */
     public function getQRCode(string $name, string $secret): string
     {
-        $otp = 'otpauth://totp/'.$name.'?secret='.$secret;
+        $otp = 'otpauth://totp/'.rawurlencode($name).'?secret='.rawurlencode($secret);
 
         return (new QRCode)->render($otp);
     }
@@ -158,29 +175,24 @@ class GoogleAuthenticator
      *
      * @return bool
      */
-    public function verifyCode(string $secret, string $code, int $discrepancy = 1, int $currentTimeSlice = null): bool
+    public function verifyCode(string $secret, string $code, int $discrepancy = 1, ?int $currentTimeSlice = null): bool
     {
-        if ($this->CI->config->item('totp_secret_name') == 'totp_secret') {
-            $expectedCode = $this->generateTOTPCode($secret);
-            return hash_equals($expectedCode, $code);
-        } else {
-            if ($currentTimeSlice === null) {
-                $currentTimeSlice = floor(time() / 30);
-            }
+        return $this->matchingTimeStep($secret, $code, $discrepancy, $currentTimeSlice) !== null;
+    }
 
-            if (strlen($code) != 6) {
-                return false;
-            }
-
-            for ($i = -$discrepancy; $i <= $discrepancy; ++$i) {
-                $calculatedCode = $this->getCode($secret, $currentTimeSlice + $i);
-                if ($this->timingSafeEquals($calculatedCode, $code)) {
-                    return true;
-                }
-            }
+    public function matchingTimeStep(string $secret, string $code, int $discrepancy = 1, ?int $currentTimeSlice = null): ?int
+    {
+        if (!preg_match('/^[0-9]{6}$/D', $code) || $discrepancy < 0 || $discrepancy > 1) return null;
+        $key = $this->storedSecretKey($secret);
+        if ($key === null) return null;
+        $currentTimeSlice ??= (int) floor(time() / 30);
+        for ($step = $currentTimeSlice + $discrepancy; $step >= max(0, $currentTimeSlice - $discrepancy); --$step) {
+            $hash = hash_hmac('sha1', pack('N2', 0, $step), $key, true);
+            $offset = ord($hash[19]) & 15;
+            $value = unpack('N', substr($hash, $offset, 4))[1] & 0x7fffffff;
+            if (hash_equals(str_pad((string) ($value % 1000000), 6, '0', STR_PAD_LEFT), $code)) return $step;
         }
-
-        return false;
+        return null;
     }
 
     /**
@@ -206,42 +218,19 @@ class GoogleAuthenticator
      */
     public function Base32Decode($secret): bool|string
     {
-        if (empty($secret)) {
-            return '';
-        }
+        if (!is_string($secret) || !preg_match('/^[A-Z2-7]{16,128}={0,6}$/D', $secret)) return false;
 
-        $base32chars = $this->getBase32LookupTable();
-        $base32charsFlipped = array_flip($base32chars);
-
-        $paddingCharCount = substr_count($secret, $base32chars[32]);
-        $allowedValues = [6, 4, 3, 1, 0];
-        if (!in_array($paddingCharCount, $allowedValues)) {
-            return false;
+        $alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567';
+        $bits = '';
+        foreach (str_split(rtrim($secret, '=')) as $character) {
+            $bits .= str_pad(decbin(strpos($alphabet, $character)), 5, '0', STR_PAD_LEFT);
         }
-        for ($i = 0; $i < 4; ++$i) {
-            if ($paddingCharCount == $allowedValues[$i] &&
-                substr($secret, -($allowedValues[$i])) != str_repeat($base32chars[32], $allowedValues[$i])) {
-                return false;
-            }
+        $result = '';
+        foreach (str_split($bits, 8) as $byte) {
+            if (strlen($byte) === 8) $result .= chr(bindec($byte));
+            elseif (bindec($byte) !== 0) return false;
         }
-        $secret = str_replace('=', '', $secret);
-        $secret = str_split($secret);
-        $binaryString = '';
-        for ($i = 0; $i < count($secret); $i = $i + 8) {
-            $x = '';
-            if (!in_array($secret[$i], $base32chars)) {
-                return false;
-            }
-            for ($j = 0; $j < 8; ++$j) {
-                $x .= str_pad(base_convert(@$base32charsFlipped[@$secret[$i + $j]], 10, 2), 5, '0', STR_PAD_LEFT);
-            }
-            $eightBits = str_split($x, 8);
-            for ($z = 0; $z < count($eightBits); ++$z) {
-                $binaryString .= (($y = chr(base_convert($eightBits[$z], 2, 10))) || ord($y) == 48) ? $y : '';
-            }
-        }
-
-        return $binaryString;
+        return $result;
     }
 
     /**

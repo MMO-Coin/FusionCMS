@@ -37,6 +37,10 @@ Existing sites must run `application/modules/install/SQL/updates/2026_11_01_01_a
 
 ## Run locally
 
+The 2FA suite uses the real security forms and login challenge on desktop and mobile. It covers server-owned enrollment keys, expired setup, current-password checks, expired and reused OTPs, protected reads and writes, secure disable, replacement rejection, account-scoped throttling and recovery of a 2FA-enabled account. It also runs enrollment and login with Base32, binary and encrypted secret storage. The CLI fixture expires only its own pending setup in the temporary session database; no production clock or account is changed.
+
+`php tests/totp_test.php` checks the SHA-1 vectors from [RFC 6238](https://www.rfc-editor.org/rfc/rfc6238), the allowed clock window, malformed input, encrypted-secret integrity, persistent replay rejection and account/key isolation. With the MySQL test environment variables above, two independent PHP workers compete for the first use of the same code, and exactly one must succeed. Reapplying the migration must preserve that rejection. Encryption checks follow TrinityCore's [AES parameters](https://github.com/TrinityCore/TrinityCore/blob/master/src/common/Cryptography/AES.h) and [envelope layout](https://github.com/TrinityCore/TrinityCore/blob/master/src/common/Cryptography/CryptoGenerics.h). They do not run a game authserver.
+
 Use a supported PHP version with the repository's required extensions, Node.js 20 or newer, Git, Composer dependencies and a MySQL or MariaDB server on loopback. The database user needs permission to create and drop the suite's temporary databases.
 
 From the repository root:
@@ -69,6 +73,8 @@ Each run creates uniquely named `fusion_e2e_<random>_cms` and `fusion_e2e_<rando
 The local RPC endpoint uses a newly generated localhost certificate. PHP trusts that certificate for this process, with HTTPS certificate and hostname verification enabled. No wallet keys or public network connection are needed. Browser requests to external origins are blocked.
 
 The runner stops the site and RPC server and removes its databases and temporary directory after testing. Run one suite at a time from a checkout.
+
+Set `FUSION_E2E_OUTPUT_DIR` to an absolute path outside the checkout to keep reports, screenshots, traces, logs and the temporary runtime manifest there. For example, PowerShell can use `$env:FUSION_E2E_OUTPUT_DIR = Join-Path $env:TEMP 'fusioncms-browser-checks'`. Generated artifacts do not belong in commits.
 
 ## Reports and failures
 

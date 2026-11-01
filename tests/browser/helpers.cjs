@@ -3,12 +3,16 @@ const path = require('node:path');
 const https = require('node:https');
 const {execFileSync} = require('node:child_process');
 const {test: base, expect} = require('@playwright/test');
-const manifest = path.resolve(__dirname, '../../output/playwright/runtime.json');
+const manifest = path.join(process.env.FUSION_E2E_OUTPUT_DIR || path.resolve(__dirname, '../../output/playwright'), 'runtime.json');
 
 function runtime() { return JSON.parse(fs.readFileSync(manifest)); }
 function fixture(action, ...args) {
     const config = runtime();
-    return execFileSync(config.php, [path.join(__dirname, 'fixture.php'), action, config.configPath, ...args], {encoding: 'utf8', windowsHide: true});
+    try {
+        return execFileSync(config.php, [path.join(__dirname, 'fixture.php'), action, config.configPath, ...args], {encoding: 'utf8', windowsHide: true});
+    } catch (error) {
+        throw new Error(`${error.message}\n${error.stdout || ''}\n${error.stderr || ''}`);
+    }
 }
 function scenario(reference, mode) {
     const file = runtime().scenarioPath;

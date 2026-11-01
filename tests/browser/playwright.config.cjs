@@ -1,7 +1,7 @@
 const path = require('node:path');
 const {defineConfig, devices} = require('@playwright/test');
 
-const output = path.resolve(__dirname, '../../output/playwright');
+const output = process.env.FUSION_E2E_OUTPUT_DIR || path.resolve(__dirname, '../../output/playwright');
 const port = Number(process.env.FUSION_E2E_PORT || 8098);
 if (!Number.isInteger(port) || port < 1024 || port > 65535) throw Error('Invalid FUSION_E2E_PORT');
 
@@ -12,7 +12,7 @@ module.exports = defineConfig({
     workers: 1,
     retries: 0,
     timeout: 60000,
-    globalTimeout: 360000,
+    globalTimeout: 600000,
     expect: {timeout: 10000},
     outputDir: path.join(output, 'results'),
     reporter: [['list'], ['html', {outputFolder: path.join(output, 'report'), open: 'never'}]],

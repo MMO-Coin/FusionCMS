@@ -98,7 +98,7 @@ const Security = {
             // Gather the values
             const values = {
                 digit: Otp,
-                csrf_token_name: Config.CSRF
+                csrf_token_name: decodeURIComponent(document.cookie.split('; ').find(value => value.startsWith('csrf_cookie_name='))?.substring('csrf_cookie_name='.length) || Config.CSRF)
             };
 
             // Submit the request
@@ -116,7 +116,9 @@ const Security = {
                 });
 
                 Security.canSubmit = true;
-            }, 'json');
+            }, 'json').fail(() => {
+                Swal.fire({text: 'Unable to verify. Reload the page and try again.', icon: 'error'});
+            }).always(() => { Security.canSubmit = true; });
         }
     },
 };

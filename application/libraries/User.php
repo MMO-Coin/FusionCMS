@@ -111,6 +111,7 @@ class User
             Services::session()->regenerate();
 
             // Set the session with the above data
+            Services::session()->remove(['totp_secret', 'totp_enrollment']);
             Services::session()->set($userdata);
 
             // Reload this object.

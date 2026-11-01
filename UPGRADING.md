@@ -17,6 +17,14 @@ Before deploying `main` to an existing site, run `application/modules/install/SQ
 
 PHP's cURL runtime must have a working CA trust store for the configured HTTPS RPC provider. Configure `curl.cainfo` when your PHP distribution does not provide one. Keep TLS certificate verification enabled.
 
+The 2FA changes on `main` also require `application/modules/install/SQL/updates/2026_11_02_00_account_totp_uses.sql` in the **website database**, before deploying the new files. Fresh installations include this table. Keep its records during session or cache cleanup and back it up with the website database. Removing them can make a recently used code acceptable again. The migration can be rerun without resetting previous claims.
+
+Changing 2FA now requires the current password and a new authenticator code. Setup expires after 10 minutes; reload the page and scan the new QR code if it expires. Disable the current authenticator before enrolling a replacement. Successful changes sign out every browser and remembered device. Codes used for setup or login cannot be reused for another website action; wait for the app's next code.
+
+For `totp_secret` accounts using TrinityCore encryption, `TOTPMasterSecret` must match the authserver's hexadecimal 128-bit key. The CMS now reads and writes authenticated AES-128-GCM envelopes with the IV and tag retained. Earlier CMS code discarded that metadata; entries produced by that broken encryption path cannot be recovered from the stored ciphertext alone. Restore a known-good secret or use your account recovery procedure on a test copy before upgrading affected accounts. Base32 `token_key` and unencrypted binary `totp_secret` accounts remain supported. Check sign-in against the actual game server before enabling encrypted enrollment for public users.
+
+Replay protection is shared by website workers using the same CMS database. It does not record authenticator codes accepted directly by a separate game authserver.
+
 If upgrading from `9.5.1`, deploy the updated files while preserving local configuration, then clear compiled templates. No database migration is needed for this patch. It fixes checkout responses that could copy request headers and download a truncated file instead of rendering HTML.
 
 If upgrading from `9.5.0-mmo.1`, deploy the updated files and clear compiled templates. The donation schema has not changed since that preview. The request limiter creates `writable/cache/throttle`; PHP must be able to write there. Its limits are shared by workers using the same filesystem. Installations with multiple web nodes need shared storage for that directory to enforce one limit across nodes.

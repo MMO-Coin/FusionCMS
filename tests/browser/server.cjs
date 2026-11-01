@@ -7,7 +7,7 @@ const {spawn, execFileSync} = require('node:child_process');
 const {startInbox} = require('./smtp.cjs');
 
 const repo = path.resolve(__dirname, '../..');
-const output = path.join(repo, 'output/playwright');
+const output = process.env.FUSION_E2E_OUTPUT_DIR || path.join(repo, 'output/playwright');
 const manifest = path.join(output, 'runtime.json');
 const php = process.env.FUSION_E2E_PHP || 'php';
 const port = Number(process.env.FUSION_E2E_PORT || 8098);

@@ -644,6 +644,20 @@ class External_account_model extends CI_Model
         return $this->totp_secret;
     }
 
+    public function changeTotpSecret(int $accountId, string $expected, ?string $replacement, string $expectedPassword): bool
+    {
+        $column = $this->config->item('totp_secret_name');
+        if (!in_array($column, ['totp_secret', 'token_key'], true)) throw new RuntimeException('Unsupported authenticator column.');
+        $db = $this->getConnection();
+        $credential = column('account', $this->config->item('account_encryption') === 'SPH' ? 'sha_pass_hash' : 'verifier');
+        if (!$credential) throw new RuntimeException('Unsupported account credential column.');
+        // Compare the exact bytes, including binary TrinityCore secrets.
+        $updated = $db->query('UPDATE ' . table('account') . ' SET ' . $column . ' = ? WHERE '
+            . column('account', 'id') . ' = ? AND BINARY COALESCE(' . $column . ", '') = BINARY ? AND UPPER("
+            . $credential . ') = UPPER(?)', [$replacement, $accountId, $expected, $expectedPassword]);
+        return $updated && $db->affectedRows() === 1;
+    }
+
     /**
      * @param string|null $encryption
      * @param $username

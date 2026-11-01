@@ -32,6 +32,17 @@ CREATE TABLE `account_session_versions` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8 COLLATE=utf8_unicode_ci;
 
 -- ----------------------------
+-- Table structure for account_totp_uses
+-- ----------------------------
+DROP TABLE IF EXISTS `account_totp_uses`;
+CREATE TABLE `account_totp_uses` (
+  `account_id` int(11) NOT NULL,
+  `secret_hash` char(64) CHARACTER SET ascii COLLATE ascii_bin NOT NULL,
+  `time_step` bigint NOT NULL,
+  PRIMARY KEY (`account_id`, `secret_hash`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8 COLLATE=utf8_unicode_ci;
+
+-- ----------------------------
 -- Table structure for acl_account_groups
 -- ----------------------------
 DROP TABLE IF EXISTS `acl_account_groups`;
