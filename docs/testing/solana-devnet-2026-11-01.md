@@ -1,6 +1,8 @@
 # Solana devnet donation test, 2026-11-01
 
-The donation flow passed against public Solana devnet after the fixes included in this fork's 9.5.1 release. A browser created the invoice, the rendered QR supplied the payment request, and the application verified the finalized transfer before granting points. No mainnet funds or production accounts were used.
+The SDK-assisted payment and rejection checks below passed against public Solana devnet. The rendered QR supplied the payment request, and the application verified the finalized transfer before granting points. No mainnet funds or production accounts were used.
+
+A later fresh checkout run exposed a response-header regression in 9.5.1. The original run had not repeated checkout after the shared-response change. That defect is now fixed on `main`. The [mobile follow-up report](solana-mobile-devnet-2026-11-01.md) records the fix, a successful native Solflare payment and a blocked Phantom launch.
 
 ## Setup
 
