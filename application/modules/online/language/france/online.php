@@ -22,3 +22,12 @@
  $lang['view_profile'] = "Voir le profil du personnage";
  $lang['online_players'] = "Joueurs en ligne";
 $lang['realm'] = "Royaume";
+$lang['load_failed'] = "Impossible de charger les joueurs en ligne. Réessayez.";
+$lang['loading'] = "Chargement des joueurs en ligne…";
+$lang['choose_realm'] = "Choisissez un royaume pour voir les joueurs en ligne.";
+$lang['updated_at'] = "Dernière mise à jour";
+$lang['no_matches'] = "Aucun joueur en ligne ne correspond à ce nom.";
+$lang['search_name'] = "Nom du personnage";
+$lang['search'] = "Rechercher";
+$lang['refresh'] = "Actualiser";
+$lang['try_again'] = "Réessayer";

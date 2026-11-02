@@ -1,158 +1,72 @@
 var Settings = {
-
-	wrongPassword: null,
-	canSubmit: true,
-
-	submit: function() {
-		// Client-side check new password and confirmation must match
-		if ($("#new_password").val() !== $("#new_password_confirm").val())
-		{
-			if (Settings.canSubmit) {
-				Swal.fire({
-					text: lang("pw_doesnt_match", "ucp"),
-					icon: 'error'
-				});
-				Settings.canSubmit = false;
-			}
-			return;
-		}
-
-		if (Settings.wrongPassword != null && Settings.wrongPassword == $("#old_password").val())
-		{
-			return false;
-		}
-
-		// Show that we're loading something
-		Settings.canSubmit = true;
-		$("#settings_ajax").html('<div class="spinner-border text-primary" role="status"><span class="visually-hidden">Loading...</span></div>');
-
-		// Gather the values
-		var values = {
-			old_password: $("#old_password").val(),
-			new_password: $("#new_password").val(),
-			csrf_token_name: Config.CSRF
-		};
-
-		// Submit the request
-		$.post(Config.URL + "ucp/settings/submit", values, function(data) {
-			// Clear spinner
-			$("#settings_ajax").html('');
-
-			// Parse the JSON response (jQuery automatically parses if server sends correct Content-Type,
-			// but we can force dataType: 'json' in the $.post settings for safety)
-			if (data.status === 'success') {
-				Swal.fire({
-					html: data.message || lang("changes_saved", "ucp"),
-					icon: 'success',
-					willClose: () => {
-						window.location = Config.URL + "login";
-					}
-				});
-			} else if (data.status === 'error') {
-				// Handle error based on its code
-				if (data.message === lang("invalid_pw", "ucp")) {
-					// Store the wrong value to avoid repeated attempts
-					Settings.wrongPassword = $("#old_password").val();
-				}
-
-				Swal.fire({
-					html: data.message || lang("invalid_pw", "ucp"),
-					icon: 'error'
-				});
-			} else {
-				// Fallback for unexpected responses
-				Swal.fire({
-					html: data.message || data,
-					icon: 'error'
-				});
-			}
-		}, 'json').fail(function(jqXHR, textStatus, errorThrown) {
-			// Handle network/server errors
-			$("#settings_ajax").html('');
-			Swal.fire({
-				html: 'Request failed: ' + textStatus,
-				icon: 'error'
-			});
-		});
-	},
-
-	submitInfo: function()
-	{
-		var value = $("#nickname_field").val(),
-			loc = $("#location_field").val(),
-			language;
-
-		if($("#language_field"))
-		{
-			language = $("#language_field").val();
-		}
-		else
-		{
-			language = 0;
-		}
-
-		if(value.length < 4 || value.length > 14)
-		{
-			Swal.fire({
-				text: lang("nickname_error", "ucp"),
-				icon: 'error'
-			});
-		}
-		else if(loc.length > 32)
-		{
-			Swal.fire({
-				text: lang("location_error", "ucp"),
-				icon: 'error'
-			});
-		}
-		else
-		{
-			// Show that we're loading something
-			$("#settings_info_ajax").html('<div class="spinner-border text-primary" role="status"><span class="visually-hidden">Loading...</span></div>');
-
-			// Submit the request
-			$.post(Config.URL + "ucp/settings/submitInfo",
-			{
-				nickname: value,
-				location: loc,
-				language: language,
-				csrf_token_name: Config.CSRF
-			},
-			function(data)
-			{
-				$("#settings_info_ajax").html("");
-				if(/1/.test(data))
-				{					
-					Swal.fire({
-						text: lang("changes_saved", "ucp"),
-						icon: 'success',
-						willClose: () => {
-							window.location.reload(true);
-						}
-					});
-				}
-				else if(/2/.test(data))
-				{					
-					Swal.fire({
-						text: lang("nickname_taken", "ucp"),
-						icon: 'error'
-					});
-				}
-				else if(/3/.test(data))
-				{
-					Swal.fire({
-						text: lang("invalid_language", "ucp"),
-						icon: 'error'
-					});
-				}
-				else
-				{
-					Swal.fire({
-						text: data,
-						icon: 'error'
-					});
-				}
-			});
-		}
-	}
-}
+    pending: {},
+    clear: function(form) {
+        $(form).find('[aria-invalid]').removeAttr('aria-invalid');
+        $(form).find('.settings-error').text('');
+        $(form).find('[role="status"]').text('');
+    },
+    errors: function(form, errors, message) {
+        var first = null;
+        Object.keys(errors || {}).forEach(function(id) {
+            var field = document.getElementById(id), error = document.getElementById(id + '_error');
+            if (!field || !error || !$.contains(form, field)) return;
+            $(field).attr('aria-invalid', 'true'); $(error).text(errors[id]);
+            if (!first) first = field;
+        });
+        $(form).find('[role="status"]').text(message || lang('settings_failed', 'ucp'));
+        if (first) first.focus();
+    },
+    send: function(id, endpoint, values, password) {
+        var form = document.getElementById(id);
+        if (this.pending[id]) return;
+        this.clear(form);
+        if (!form.reportValidity()) return;
+        this.pending[id] = true;
+        var controls = $(form).find('input, select, button').toArray().map(function(node) {
+            var before = node.disabled; node.disabled = true; return {node:node, disabled:before};
+        });
+        var proxies = $(form).find('.sbHolder').toArray().map(function(node) {
+            var before = node.inert; node.inert = true; return {node:node, inert:before};
+        });
+        $(form).attr('aria-busy', 'true');
+        $(form).find('[role="status"]').text(lang('settings_saving', 'ucp'));
+        values.csrf_token_name = getCookie('csrf_cookie_name');
+        $.ajax({url: Config.URL + endpoint, method: 'POST', data: values, dataType: 'json'}).done(function(result) {
+            if (!result || result.status !== 'success') {
+                Settings.errors(form, result && result.errors, result && result.message); return;
+            }
+            $(form).find('[role="status"]').text(result.message || lang('changes_saved', 'ucp'));
+            if (password) {
+                $(form).find('input[type="password"]').val('');
+                Swal.fire({text: result.message || lang('changes_saved', 'ucp'), icon: 'success',
+                    willClose: function() { window.location = Config.URL + 'login'; }});
+            } else if (result.reload) {
+                $('<button>', {type:'button', class:'nice_button mt-2', text:lang('settings_reload', 'ucp')})
+                    .on('click', function() { window.location.reload(); }).appendTo($(form).find('[role="status"]'));
+            }
+        }).fail(function(xhr) {
+            var result = xhr.responseJSON;
+            Settings.errors(form, result && result.errors, result && result.message || lang('settings_failed', 'ucp'));
+        }).always(function() {
+            delete Settings.pending[id];
+            controls.forEach(function(control) { control.node.disabled = control.disabled; });
+            proxies.forEach(function(proxy) { proxy.node.inert = proxy.inert; });
+            $(form).attr('aria-busy', 'false');
+            var invalid = form.querySelector('[aria-invalid="true"]');
+            if (invalid) invalid.focus();
+        });
+    },
+    submit: function() {
+        var form = document.getElementById('settings');
+        if (this.pending.settings) return;
+        this.clear(form);
+        if ($('#new_password').val() !== $('#new_password_confirm').val()) {
+            this.errors(form, {new_password_confirm: lang('pw_doesnt_match', 'ucp')}, lang('pw_doesnt_match', 'ucp')); return;
+        }
+        this.send('settings', 'ucp/settings/submit', {old_password:$('#old_password').val(), new_password:$('#new_password').val()}, true);
+    },
+    submitInfo: function() {
+        this.send('settings_info', 'ucp/settings/submitInfo', {nickname:$('#nickname_field').val(), location:$('#location_field').val(),
+            language:$('#language_field').length ? $('#language_field').val() : ''}, false);
+    }
+};

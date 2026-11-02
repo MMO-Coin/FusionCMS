@@ -37,12 +37,13 @@ class Settings extends MX_Controller
         clientLang("invalid_pw", "ucp");
         clientLang("nickname_taken", "ucp");
         clientLang("invalid_language", "ucp");
+        foreach (['settings_saving', 'settings_failed', 'settings_reload'] as $key) clientLang($key, 'ucp');
 
         $this->template->setTitle(lang("settings", "ucp"));
 
         $settings_data = [
-            'nickname' => $this->user->getNickname(),
-            'location' => $this->internal_user_model->getLocation(),
+            'nickname' => html_entity_decode($this->user->getNickname(), ENT_QUOTES | ENT_HTML5, 'UTF-8'),
+            'location' => html_entity_decode($this->internal_user_model->getLocation(), ENT_QUOTES | ENT_HTML5, 'UTF-8'),
             'show_language_chooser' => $this->config->item('show_language_chooser'),
             'userLanguage' => $this->language->getLanguage(),
             "avatar" => $this->user->getAvatar($this->user->getId()),
@@ -80,6 +81,8 @@ class Settings extends MX_Controller
 
     public function submit()
     {
+        requirePermission('canUpdateAccountSettings');
+        header('Content-Type: application/json; charset=utf-8');
         if ($this->input->method() !== 'post') {
             show_error('Invalid request', 403);
         }
@@ -90,7 +93,8 @@ class Settings extends MX_Controller
         if ($this->form_validation->run() === false) {
             $response = [
                 'status'  => 'error',
-                'message' => validation_errors()
+                'message' => trim(strip_tags(validation_errors())),
+                'errors' => array_map('strip_tags', $this->form_validation->error_array())
             ];
             die(json_encode($response));
         }
@@ -124,72 +128,56 @@ class Settings extends MX_Controller
         } else {
             $response = [
                 'status'  => 'error',
-                'message' => lang("invalid_pw", "ucp")
+                'message' => lang("invalid_pw", "ucp"),
+                'errors' => ['old_password' => lang('invalid_pw', 'ucp')]
             ];
         }
 
         die(json_encode($response));
     }
 
+    private function profileResponse(string $status, string $message, array $errors = [], bool $reload = false): void
+    {
+        header('Content-Type: application/json; charset=utf-8');
+        die(json_encode(['status' => $status, 'message' => $message, 'errors' => $errors, 'reload' => $reload], JSON_INVALID_UTF8_SUBSTITUTE));
+    }
+
     public function submitInfo()
     {
-        $this->load->model("settings_model");
-
-        // Gather the values
-
-        $nickname = $this->input->post("nickname");
-        $location = $this->input->post("location");
-
-        if (!is_string($nickname) || !is_string($location)) {
-            die("4");
+        requirePermission('canUpdateAccountSettings');
+        if ($this->input->method() !== 'post') { http_response_code(405); header('Allow: POST'); $this->profileResponse('error', lang('settings_failed', 'ucp')); }
+        $this->load->model('settings_model');
+        $nickname = $this->input->post('nickname', false);
+        $location = $this->input->post('location', false);
+        $errors = [];
+        if (!is_string($nickname) || !is_string($location)) $this->profileResponse('error', lang('settings_failed', 'ucp'));
+        $nickname = trim($nickname); $location = trim($location);
+        $currentNickname = html_entity_decode($this->user->getNickname(), ENT_QUOTES | ENT_HTML5, 'UTF-8');
+        if ($nickname !== $currentNickname) {
+            if (!preg_match('/^[A-Za-z0-9]{4,14}$/D', $nickname)) $errors['nickname_field'] = lang('nickname_error', 'ucp');
+            elseif ($this->internal_user_model->nicknameExists($nickname)) $errors['nickname_field'] = lang('nickname_taken', 'ucp');
         }
-
-        if (strlen($location) > 32 && !ctype_alpha($location)) {
-            die(lang("location_error", "ucp"));
-        }
-
-        // Update sanitization according to CMS standards.
-        $values = [
-            'nickname' => $this->template->format($nickname),
-            'location' => $this->template->format($location),
-        ];
-
-        // Change language
+        if (mb_strlen($location) > 32) $errors['location_field'] = lang('location_error', 'ucp');
+        $language = null;
         if ($this->config->item('show_language_chooser')) {
-            $values['language'] = $this->input->post("language");
-
-            if (!is_dir("application/language/" . $values['language'])) {
-                die("3");
-            } else {
-                $this->user->setLanguage($values['language']);
-
-                Events::trigger('onSetLanguage', $this->user->getId(), $values['language']);
-            }
+            $language = $this->input->post('language', false);
+            if (!is_string($language) || !in_array($language, $this->language->getAllLanguages(), true)) $errors['language_field'] = lang('invalid_language', 'ucp');
         }
-
-        $currentNickname = $this->user->getNickname();
-
-        // Remove the nickname field if it wasn't changed
-        if ($values['nickname'] == $currentNickname) {
-            unset($values['nickname']);
-        } else {
-            if (strlen($values['nickname']) < 4 || strlen($values['nickname']) > 14) {
-                die(lang("nickname_error", "ucp"));
-            }
-
-            if (!preg_match("/^[A-Za-z0-9]+$/", $values['nickname'])) {
-                die(lang("nickname_error", "ucp"));
-            }
-
-            if ($this->internal_user_model->nicknameExists($values['nickname'])) {
-                die("2");
-            }
+        if ($errors) $this->profileResponse('error', reset($errors), $errors);
+        $values = ['location' => $this->template->format($location)];
+        if ($nickname !== $currentNickname) $values['nickname'] = $nickname;
+        if ($language !== null) $values['language'] = $language;
+        try {
+            if (!$this->settings_model->saveSettings($values)) throw new RuntimeException('Profile write failed');
+        } catch (Throwable $error) {
+            http_response_code(503); $this->profileResponse('error', lang('settings_failed', 'ucp'));
         }
-
-        $this->settings_model->saveSettings($values);
-
-        Events::trigger('onSaveSettingsAccount', $this->user->getId(), $values);
-
-        die("1");
+        $reload = $language !== null && $language !== $this->language->getLanguage();
+        if ($language !== null) Services::session()->set('language', $language);
+        try {
+            if ($reload) Events::trigger('onSetLanguage', $this->user->getId(), $language);
+            Events::trigger('onSaveSettingsAccount', $this->user->getId(), $values);
+        } catch (Throwable $error) { log_message('error', 'Account settings notification failed'); }
+        $this->profileResponse('success', lang('changes_saved', 'ucp'), [], $reload);
     }
 }

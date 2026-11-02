@@ -4,148 +4,70 @@ require_once dirname(__DIR__, 3) . '/libraries/LogPagination.php';
 
 class Dashboard_model extends CI_Model
 {
-    public function getUnique($type)
+    private array $totals = [];
+
+    public static function periods(?DateTimeImmutable $now = null): array
     {
-        if ($type == "today") {
-            $date = date("Y-m-d");
-        } else {
-            $date = date("Y-m-d", time() - 60 * 60 * 24 * 30);
-        }
-
-        if ($type == "today") {
-            $query = $this->db->query("SELECT COUNT(DISTINCT ip,`date`) as `total` FROM visitor_log WHERE `date` >= ?", array($date));
-        } else {
-            $query = $this->db->query("SELECT COUNT(DISTINCT ip) as `total` FROM visitor_log WHERE `date` >= ?", array($date));
-        }
-
-        $row = $query->getResultArray();
-
-        return $row[0]['total'];
+        $today = ($now ?? new DateTimeImmutable('today'))->setTime(0, 0);
+        $month = $today->modify('first day of this month');
+        return ['today' => $today->format('Y-m-d'), 'tomorrow' => $today->modify('+1 day')->format('Y-m-d'),
+            'month' => $month->format('Y-m-d'), 'previous_month' => $month->modify('-1 month')->format('Y-m-d'),
+            'this_key' => $month->format('Y-m'), 'last_key' => $month->modify('-1 month')->format('Y-m')];
     }
 
-    public function getViews($type)
+    /** One snapshot per request, with bounded calendar ranges and four aggregate reads. */
+    public function getTotals(?DateTimeImmutable $now = null): array
     {
-        if ($type == "today") {
-            $date = date("Y-m-d");
-        } else {
-            $date = date("Y-m-d", time() - 60 * 60 * 24 * 30);
+        $p = self::periods($now);
+        if (isset($this->totals[$p['today']])) return $this->totals[$p['today']];
+        $visitors = $this->db->query('SELECT COUNT(DISTINCT CASE WHEN `date` = ? THEN ip END) AS today_unique,
+            COUNT(CASE WHEN `date` = ? THEN 1 END) AS today_visits, COUNT(DISTINCT ip) AS month_unique, COUNT(*) AS month_visits
+            FROM visitor_log WHERE `date` >= ? AND `date` < ?', [$p['today'], $p['today'], $p['month'], $p['tomorrow']])->getRowArray();
+        $signups = $this->db->query('SELECT COALESCE(SUM(CASE WHEN `date` = ? THEN amount ELSE 0 END), 0) AS today_total,
+            COALESCE(SUM(CASE WHEN `date` >= ? THEN amount ELSE 0 END), 0) AS month_total,
+            COALESCE(SUM(CASE WHEN `date` < ? THEN amount ELSE 0 END), 0) AS last_total
+            FROM daily_signups WHERE `date` >= ? AND `date` < ?',
+            [$p['today'], $p['month'], $p['month'], $p['previous_month'], $p['tomorrow']])->getRowArray();
+        $monthly = [];
+        foreach (['income' => 'monthly_income', 'votes' => 'monthly_votes'] as $key => $table) {
+            $row = $this->db->query('SELECT COALESCE(SUM(CASE WHEN month = ? THEN amount ELSE 0 END), 0) AS this_total,
+                COALESCE(SUM(CASE WHEN month = ? THEN amount ELSE 0 END), 0) AS last_total FROM ' . $table . ' WHERE month IN (?, ?)',
+                [$p['this_key'], $p['last_key'], $p['this_key'], $p['last_key']])->getRowArray();
+            $monthly[$key] = ['this' => $row['this_total'], 'last' => $row['last_total']];
         }
-
-        $query = $this->db->query("SELECT COUNT(*) as `total` FROM visitor_log WHERE `date` >= ?", array($date));
-
-        $row = $query->getResultArray();
-
-        return $row[0]['total'];
+        return $this->totals[$p['today']] = ['unique' => ['today' => (int) $visitors['today_unique'], 'month' => (int) $visitors['month_unique']],
+            'views' => ['today' => (int) $visitors['today_visits'], 'month' => (int) $visitors['month_visits']],
+            'signups' => ['today' => (int) $signups['today_total'], 'month' => (int) $signups['month_total'],
+                'this' => (int) $signups['month_total'], 'last' => (int) $signups['last_total']],
+            'income' => $monthly['income'], 'votes' => $monthly['votes']];
     }
 
-    public function getIncome($type)
+    public function getUnique($type) { return $this->getTotals()['unique'][$type === 'today' ? 'today' : 'month']; }
+    public function getViews($type) { return $this->getTotals()['views'][$type === 'today' ? 'today' : 'month']; }
+    public function getIncome($type) { return $this->getTotals()['income'][$type === 'this' ? 'this' : 'last']; }
+    public function getVotes($type) { return $this->getTotals()['votes'][$type === 'this' ? 'this' : 'last']; }
+    public function getSignupsMonthly($type) { return $this->getTotals()['signups'][$type === 'this' ? 'this' : 'last']; }
+    public function getSignupsDaily($type) { return $this->getTotals()['signups'][$type === 'today' ? 'today' : 'month']; }
+
+    public function getGraph(bool $daily = false, array $agos = [0], ?DateTimeImmutable $now = null): array
     {
-        if ($type == "this") {
-            $date = date("Y-m");
-        } else {
-            $date = date("Y-m", time() - 60 * 60 * 24 * 30);
-        }
-
-        $query = $this->db->query("SELECT amount FROM monthly_income WHERE month=?", array($date));
-
-        if ($query->getNumRows()) {
-            $row = $query->getResultArray();
-
-            return $row[0]['amount'];
-        } else {
-            return 0;
-        }
-    }
-
-    public function getVotes($type)
-    {
-        if ($type == "this") {
-            $date = date("Y-m");
-        } else {
-            $date = date("Y-m", time() - 60 * 60 * 24 * 30);
-        }
-
-        $query = $this->db->query("SELECT amount FROM monthly_votes WHERE month=?", array($date));
-
-        if ($query->getNumRows()) {
-            $row = $query->getResultArray();
-
-            return $row[0]['amount'];
-        } else {
-            return 0;
-        }
-    }
-
-    public function getSignupsMonthly($type)
-    {
-        if ($type == "this") {
-            $date = date("Y-m") . "-01";
-        } else {
-            $date = date("Y-m", time() - 60 * 60 * 24 * 30) . "-01";
-            $next = date("Y-m") . "-01";
-        }
-
-        if ($type == "this") {
-            $query = $this->db->query("SELECT amount FROM daily_signups WHERE `date` >= ?", [$date]);
-        } else {
-            $query = $this->db->query("SELECT amount FROM daily_signups WHERE `date` >= ? AND `date` < ?", [$date, $next]);
-        }
-
-        if ($query->getNumRows()) {
-            $row = $query->getResultArray();
-
-            $total = 0;
-
-            foreach ($row as $item) {
-                $total += $item['amount'];
-            }
-
-            return $total;
-        } else {
-            return 0;
-        }
-    }
-
-    public function getSignupsDaily($type)
-    {
-        if ($type == "today") {
-            $date = date("Y-m-d");
-        } else {
-            $date = date("Y-m-d", time() - 60 * 60 * 24 * 30);
-        }
-
-        $query = $this->db->query("SELECT amount FROM daily_signups WHERE `date` >= ?", array($date));
-
-        if ($query->getNumRows()) {
-            $row = $query->getResultArray();
-
-            return $row[0]['amount'];
-        } else {
-            return 0;
-        }
-    }
-
-    public function getGraph(bool $daily = false, array $agos = [0]): array
-    {
-        $unionQueries = [];
-
+        $today = ($now ?? new DateTimeImmutable('today'))->setTime(0, 0);
+        $agoList = [];
         foreach ($agos as $ago) {
-            if ($daily) {
-                $from = "DATE_FORMAT(CURRENT_DATE - INTERVAL {$ago} MONTH, '%Y-%m-01')";
-                $to   = "LAST_DAY(CURRENT_DATE - INTERVAL {$ago} MONTH)";
-            } else {
-                $from = "DATE_FORMAT(CURRENT_DATE - INTERVAL {$ago} YEAR, '%Y-01-01')";
-                $to   = "DATE_FORMAT(CURRENT_DATE - INTERVAL {$ago} YEAR, '%Y-12-31')";
-            }
-
-            $unionQueries[] = "SELECT visitor_log.date, COUNT(DISTINCT ip) as ipCount, {$ago} as ago FROM visitor_log WHERE visitor_log.date BETWEEN {$from} AND {$to} GROUP BY visitor_log.date";
+            $ago = filter_var($ago, FILTER_VALIDATE_INT, ['options' => ['min_range' => 0, 'max_range' => 10]]);
+            if ($ago !== false) $agoList[$ago] = $ago;
         }
-
-        $finalQuery = implode(" UNION ALL ", $unionQueries);
-
-        $query = $this->db->query($finalQuery);
-
-        return $query->getResultArray();
+        if (!$agoList) return [];
+        $queries = []; $bindings = [];
+        foreach ($agoList as $ago) {
+            $from = $daily ? $today->modify('first day of this month')->modify('-' . $ago . ' months')
+                : $today->setDate((int) $today->format('Y') - $ago, 1, 1);
+            $to = $from->modify($daily ? '+1 month' : '+1 year');
+            if ($to > $today->modify('+1 day')) $to = $today->modify('+1 day');
+            $queries[] = 'SELECT `date`, COUNT(DISTINCT ip) AS ipCount, ? AS ago FROM visitor_log WHERE `date` >= ? AND `date` < ? GROUP BY `date`';
+            array_push($bindings, $ago, $from->format('Y-m-d'), $to->format('Y-m-d'));
+        }
+        return $this->db->query(implode(' UNION ALL ', $queries), $bindings)->getResultArray();
     }
 
     /* Modules */

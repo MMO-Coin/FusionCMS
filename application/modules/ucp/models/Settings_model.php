@@ -2,9 +2,9 @@
 
 class Settings_model extends CI_Model
 {
-    public function saveSettings($values)
+    public function saveSettings($values): bool
     {
-        $this->db->table('account_data')->update($values, ['id' => $this->user->getId()]);
+        return $this->db->table('account_data')->update($values, ['id' => $this->user->getId()]);
     }
 
     public function get_all_avatars()

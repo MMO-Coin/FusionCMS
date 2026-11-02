@@ -2,27 +2,27 @@
 <div id="popup_bg"></div>
 
 <!-- Confirm box -->
-<div id="confirm" class="popup-box type-confirm v-center" style="display:none">
+<div id="confirm" role="dialog" aria-modal="true" aria-labelledby="confirm_question" aria-hidden="true" tabindex="-1" class="popup-box type-confirm v-center" style="display:none">
 	<div id="confirm_question" class="popup-content"></div>
 
 	<div class="popup-buttons">
-		<a href="javascript:void(0)" id="confirm_button" class="nice_button popup-button type-action"></a>
-		<a href="javascript:void(0)" id="confirm_hide" class="nice_button popup-button type-cancel" onClick="UI.hidePopup()">{lang('global_cancel', 'theme')}</a>
+		<button type="button" id="confirm_button" class="nice_button popup-button type-action"></button>
+		<button type="button" id="confirm_hide" class="nice_button popup-button type-cancel">{lang('global_cancel', 'theme')}</button>
 	</div>
 </div>
 
 <!-- Alert box -->
-<div id="alert" class="popup-box type-alert v-center" style="display:none">
+<div id="alert" role="dialog" aria-modal="true" aria-labelledby="alert_message" aria-hidden="true" tabindex="-1" class="popup-box type-alert v-center" style="display:none">
 	<div id="alert_message" class="popup-content"></div>
 
 	<div class="popup-buttons">
-		<a href="javascript:void(0)" id="alert_button" class="nice_button popup-button type-okay">{lang('global_okay', 'theme')}</a>
+		<button type="button" id="alert_button" class="nice_button popup-button type-okay">{lang('global_okay', 'theme')}</button>
 	</div>
 </div>
 
 {if $vote_reminder}
 	<!-- Vote reminder popup -->
-	<div id="vote_reminder">
+	<div id="vote_reminder" aria-label="{lang('vote', 'main')}">
 		<a href="{$url}vote"><img width="" height="" alt="" src="{$vote_reminder_image}" /></a>
 	</div>
 {/if}

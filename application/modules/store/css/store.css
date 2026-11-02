@@ -2,6 +2,45 @@
 	text-align: right;
 }
 
+.catalogue-filter {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 1rem;
+    margin-bottom: 1rem;
+}
+
+.catalogue-filter label {
+    display: block;
+    margin-bottom: .35rem;
+}
+
+.catalogue-filter input,
+.catalogue-filter select {
+    width: 100%;
+    min-width: 0;
+}
+
+.catalogue-submit {
+    align-self: end;
+}
+
+.catalogue-item .item_name,
+.catalogue-description {
+    overflow-wrap: anywhere;
+}
+
+.catalogue-description {
+    white-space: normal;
+}
+
+.catalogue-item .store_buttons button {
+    min-height: 44px;
+}
+
+@media (max-width: 575.98px) {
+    .catalogue-filter { grid-template-columns: minmax(0, 1fr); }
+}
+
 .store_item {
 	border: 1px solid #10181f !important;
 	background-color: rgba(0, 0, 0, 0.1);

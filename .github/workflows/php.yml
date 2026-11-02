@@ -106,6 +106,15 @@ jobs:
     - name: Run public asset dependency checks
       run: php tests/public_assets_test.php
 
+    - name: Run remaining P2 catalogue, online player and dashboard regressions
+      env:
+        FUSION_TEST_MYSQL_HOST: 127.0.0.1
+        FUSION_TEST_MYSQL_PASSWORD: fusion_test
+      run: |
+        php tests/store_catalogue_test.php
+        php tests/online_players_test.php
+        php tests/dashboard_totals_test.php
+
     - name: Run donation security and schema regression tests
       env:
         FUSION_TEST_MYSQL_HOST: 127.0.0.1

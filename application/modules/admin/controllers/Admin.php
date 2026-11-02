@@ -9,6 +9,7 @@ use MX\MX_Controller;
  */
 class Admin extends MX_Controller
 {
+    private array $totals = [];
     public function __construct()
     {
         parent::__construct();
@@ -38,6 +39,11 @@ class Admin extends MX_Controller
                 }
             }
         }
+
+        $summaryKey = 'dashboard_totals_v2_' . date('Y_m_d');
+        $summary = $this->cache->get($summaryKey);
+        $this->totals = is_array($summary) ? $summary : $this->dashboard_model->getTotals();
+        if (!is_array($summary)) $this->cache->save($summaryKey, $this->totals, 60);
 
         $graphMonthly = $this->getGraphData(false, [0, 1]);
         $graphDaily   = $this->getGraphData(true, [0, 1, 2]);
@@ -83,24 +89,21 @@ class Admin extends MX_Controller
 
     private function getUnique()
     {
-        $data['today'] = $this->dashboard_model->getUnique("today");
-        $data['month'] = $this->dashboard_model->getUnique("month");
+        $data = $this->totals['unique'];
 
         return $data;
     }
 
     private function getViews()
     {
-        $data['today'] = $this->dashboard_model->getViews("today");
-        $data['month'] = $this->dashboard_model->getViews("month");
+        $data = $this->totals['views'];
 
         return $data;
     }
 
     private function getIncome()
     {
-        $data['this'] = $this->dashboard_model->getIncome("this");
-        $data['last'] = $this->dashboard_model->getIncome("last");
+        $data = $this->totals['income'];
         $data['growth'] = ($data['this'] > 0 && $data['last'] > 0) ? round((($data['this'] - $data['last']) / $data['last']) * 100, 2) : 0;
 
         return $data;
@@ -108,8 +111,7 @@ class Admin extends MX_Controller
 
     private function getVotes()
     {
-        $data['this'] = $this->dashboard_model->getVotes("this");
-        $data['last'] = $this->dashboard_model->getVotes("last");
+        $data = $this->totals['votes'];
         $data['growth'] = ($data['this'] > 0 && $data['last'] > 0) ? round((($data['this'] - $data['last']) / $data['last']) * 100, 2) : 0;
 
         return $data;
@@ -117,20 +119,17 @@ class Admin extends MX_Controller
 
     private function getSignups()
     {
-        $data['today'] = $this->dashboard_model->getSignupsDaily("today");
-        $data['month'] = $this->dashboard_model->getSignupsDaily("month");
-        $data['this'] = $this->dashboard_model->getSignupsMonthly("this");
-        $data['last'] = $this->dashboard_model->getSignupsMonthly("last");
+        $data = $this->totals['signups'];
         $data['growth'] = ($data['this'] > 0 && $data['last'] > 0) ? round((($data['this'] - $data['last']) / $data['last']) * 100, 2) : 0;
 
-        $cache = $this->cache->get("total_accounts");
+        $cache = $this->cache->get("dashboard_total_accounts_v2");
 
         if ($cache !== false)
         {
             $data['total'] = $cache;
         } else {
             $data['total'] = $this->external_account_model->getAccountCount();
-            $this->cache->save("total_accounts", $data['total'], 60 * 60 * 24);
+            $this->cache->save("dashboard_total_accounts_v2", $data['total'], 60);
         }
 
         return $data;
@@ -187,7 +186,8 @@ class Admin extends MX_Controller
         }
 
         if (!$daily) {
-            foreach ($results as $ago => $months) {
+            foreach ($agoDataList as $ago) {
+                $months = $results[$ago];
                 $year = date('Y') - $ago;
                 $results[$ago] = [
                     (string) $year => [
@@ -208,21 +208,14 @@ class Admin extends MX_Controller
 
     private function getGraphCacheKey(string $type, int $ago): string
     {
-        if ($ago === 0) {
-            return "dashboard_{$type}";
-        }
-        $suffix = $type === 'daily' ? 'month' : 'year';
-        return "dashboard_{$type}_{$ago}_{$suffix}_ago";
+        $period = new DateTimeImmutable($type === 'daily' ? 'first day of this month' : date('Y') . '-01-01');
+        $period = $period->modify('-' . $ago . ($type === 'daily' ? ' months' : ' years'));
+        return 'dashboard_graph_v2_' . $type . '_' . $period->format('Y_m');
     }
 
     private function getGraphCacheTTL(string $type, int $ago): int
     {
-        if ($type === 'monthly') {
-            //                   Every two weeks  -  Every 9 months
-            return $ago === 0 ? 60 * 60 * 24 * 15 : 60 * 60 * 24 * 30 * 9;
-        } else {
-            return 60 * 60 * 24; // 24h
-        }
+        return $ago === 0 ? 60 : 86400;
     }
 
     public function checkSoap()

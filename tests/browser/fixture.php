@@ -57,11 +57,14 @@ function assertOwner(mysqli $db, string $database, string $nonce): void {
 }
 function resetFixture(mysqli $db, array $config): void {
     $db->select_db($config['cms']);
-    foreach (['donate_mmo_transactions', 'monthly_income', 'failed_logins', 'remember_me_tokens', 'password_recovery_key', 'email_log', 'account_session_versions', 'account_totp_uses', 'account_sessions', 'private_message', 'comments', 'article_tag', 'articles', 'realms', 'order_log', 'gm_log', 'store_items', 'image_slider'] as $table) $db->query("DELETE FROM `$table`");
+    foreach (['donate_mmo_transactions', 'monthly_income', 'failed_logins', 'remember_me_tokens', 'password_recovery_key', 'email_log', 'account_session_versions', 'account_totp_uses', 'account_sessions', 'private_message', 'comments', 'article_tag', 'articles', 'realms', 'order_log', 'gm_log', 'store_items', 'image_slider', 'daily_signups', 'monthly_votes', 'visitor_log'] as $table) $db->query("DELETE FROM `$table`");
+    $db->query('DELETE FROM store_groups WHERE id > 1');
     $db->query('DELETE FROM account_data WHERE id > 3');
     $db->query('UPDATE account_data SET dp = 0, vp = 0');
+    foreach ([1=>'E2EPLAYER',2=>'E2EOTHER',3=>'E2EOWNER'] as $id=>$nickname) $db->query("UPDATE account_data SET nickname='$nickname', location='Unknown', language='english' WHERE id=$id");
     $db->select_db($config['auth']);
     foreach (['characters', 'guild', 'guild_member', 'guild_rank', 'item_template'] as $table) $db->query("DELETE FROM `$table`");
+    $db->query('DELETE FROM account_access');
     $db->query('DELETE FROM account WHERE id > 3');
     $db->query("UPDATE account SET sha_pass_hash = UPPER(SHA1(CONCAT(username, ':BROWSERTEST123'))), totp_secret = NULL, token_key = NULL");
     foreach (glob($config['root'] . '/site/writable/cache/throttle/*.json') as $file) unlink($file);
@@ -74,11 +77,39 @@ function resetFixture(mysqli $db, array $config): void {
     $editor = new ConfigEditor($config['root'] . '/site/application/config/fusion.php');
     $editor->set('cache', false); $editor->set('theme', 'default'); $editor->save();
     copy(dirname(__DIR__, 2) . '/application/config/performance.php', $config['root'] . '/site/application/config/performance.php');
-    foreach (['news', 'messages'] as $module) copy(dirname(__DIR__, 2) . "/application/modules/$module/config/$module.php", $config['root'] . "/site/application/modules/$module/config/$module.php");
-    foreach (['news_*.cache', 'comments_*.cache', 'messages/*'] as $pattern) {
+    foreach (['news', 'messages', 'online'] as $module) copy(dirname(__DIR__, 2) . "/application/modules/$module/config/$module.php", $config['root'] . "/site/application/modules/$module/config/$module.php");
+    foreach (['*.cache', 'messages/*'] as $pattern) {
         foreach (glob($config['root'] . '/site/writable/cache/data/' . $pattern) as $file) if (is_file($file)) unlink($file);
     }
     copy(dirname(__DIR__, 2) . '/application/config/Session.php', $config['root'] . '/site/application/config/Session.php');
+}
+function seedFixtureRealm(mysqli $db, array $config, int $id, string $name): void {
+    $db->select_db($config['cms']);
+    $realm = $db->prepare('INSERT INTO realms (id, hostname, username, password, char_database, world_database, cap, expansion, realmName, emulator, realm_port, override_port_char, override_port_world) VALUES (?, ?, ?, ?, ?, ?, 100, 2, ?, \'trinity\', 0, ?, ?)');
+    $realm->bind_param('issssssii', $id, $config['dbHost'], $config['dbUser'], $config['dbPassword'], $config['auth'], $config['auth'], $name, $config['dbPort'], $config['dbPort']); $realm->execute();
+}
+function seedArmoryFixture(mysqli $db, array $config): void {
+    $site = $config['root'] . '/site';
+    seedFixtureRealm($db, $config, 1, 'Browser Realm');
+    $db->select_db($config['auth']);
+    for ($id = 1; $id <= 125; $id++) {
+        $name = sprintf('Search%03d', $id);
+        $db->query("INSERT INTO characters (guid,name,race,gender,class,level,online) VALUES ($id, '$name', 1, 0, 1, 60, 0)");
+        $leader = $id === 2 ? 9999 : 1;
+        $db->query("INSERT INTO guild (guildid, name, leaderguid) VALUES ($id, '$name', $leader)");
+        if ($id !== 1) $db->query("INSERT INTO guild_member (guildid, guid) VALUES ($id, $id)");
+        $db->query("INSERT INTO item_template VALUES ($id, '$name', 60, 50, 13, 3, 2, 7)");
+    }
+    $character = $db->prepare('INSERT INTO characters (guid,name,race,gender,class,level,online) VALUES (?, ?, 1, 0, 1, 60, 0)');
+    foreach (['Literal%Name', 'Literal_Name', "O'Name", '<b>Literal</b>', 'Percent%41Name'] as $i => $name) {
+        $id = 200 + $i; $character->bind_param('is', $id, $name); $character->execute();
+    }
+    require_once $site . '/application/libraries/ConfigEditor.php';
+    $editor = new ConfigEditor($site . '/application/config/fusion.php'); $editor->set('cache', true); $editor->save();
+    $folder = $site . '/writable/cache/data/items';
+    if (!is_dir($folder)) mkdir($folder, 0777, true);
+    for ($id = 1; $id <= 125; $id++) file_put_contents($folder . '/item_1_' . $id . '.cache', json_encode(['expiration' => time() + 3600, 'content' => ['icon' => 'inv_misc_questionmark']]));
+    echo 'Seeded the owned Armory realm fixture.';
 }
 if ($action === 'setup') {
     // CREATE without IF NOT EXISTS prevents the installer SQL from touching an existing database.
@@ -106,7 +137,7 @@ if ($action === 'setup') {
     $db->query('CREATE TABLE account_access (AccountId INT, SecurityLevel INT, RealmID INT DEFAULT -1)');
     $db->query('CREATE TABLE account_banned (id INT, banreason VARCHAR(255), active INT, bandate INT, unbandate INT, bannedby VARCHAR(50))');
     $db->query('CREATE TABLE ip_banned (ip VARCHAR(45), banreason VARCHAR(255), bandate INT, unbandate INT, bannedby VARCHAR(50))');
-    $db->query('CREATE TABLE characters (guid INT PRIMARY KEY, name VARCHAR(100), race INT, gender INT, class INT, level INT, online INT DEFAULT 0, account INT DEFAULT 1)');
+    $db->query('CREATE TABLE characters (guid INT PRIMARY KEY, name VARCHAR(100), race INT, gender INT, class INT, level INT, online INT DEFAULT 0, account INT DEFAULT 1, zone INT DEFAULT 1)');
     $db->query('CREATE TABLE guild (guildid INT PRIMARY KEY, name VARCHAR(100), leaderguid INT, motd TEXT, info TEXT, createdate INT)');
     $db->query('CREATE TABLE guild_member (guildid INT, guid INT, `rank` INT DEFAULT 0, INDEX (guildid))');
     $db->query('CREATE TABLE guild_rank (guildid INT, rid INT, rname VARCHAR(60), rights INT)');
@@ -240,28 +271,71 @@ if ($action === 'cleanup') {
     $row['claims'] = $db->query('SELECT * FROM account_totp_uses ORDER BY account_id, secret_hash')->fetch_all(MYSQLI_ASSOC);
     echo json_encode($row, JSON_THROW_ON_ERROR);
 } elseif ($action === 'seed-armory') {
+    seedArmoryFixture($db, $config);
+} elseif ($action === 'seed-store-catalogue') {
+    seedArmoryFixture($db, $config);
+    seedFixtureRealm($db, $config, 2, 'Second Realm');
     $db->select_db($config['cms']);
-    $realm = $db->prepare('INSERT INTO realms (id, hostname, username, password, char_database, world_database, cap, expansion, realmName, emulator, realm_port, override_port_char, override_port_world) VALUES (1, ?, ?, ?, ?, ?, 100, 2, \'Browser Realm\', \'trinity\', 0, ?, ?)');
-    $realm->bind_param('sssssii', $config['dbHost'], $config['dbUser'], $config['dbPassword'], $config['auth'], $config['auth'], $config['dbPort'], $config['dbPort']); $realm->execute();
-    $db->select_db($config['auth']);
-    for ($id = 1; $id <= 125; $id++) {
-        $name = sprintf('Search%03d', $id);
-        $db->query("INSERT INTO characters (guid,name,race,gender,class,level,online) VALUES ($id, '$name', 1, 0, 1, 60, 0)");
-        $leader = $id === 2 ? 9999 : 1;
-        $db->query("INSERT INTO guild (guildid, name, leaderguid) VALUES ($id, '$name', $leader)");
-        if ($id !== 1) $db->query("INSERT INTO guild_member (guildid, guid) VALUES ($id, $id)");
-        $db->query("INSERT INTO item_template VALUES ($id, '$name', 60, 50, 13, 3, 2, 7)");
+    $db->query("UPDATE store_groups SET title='Equipment' WHERE id=1");
+    $db->query("INSERT INTO store_groups (id,title,icon,orderNumber) VALUES (31,'Weapons','sword',31)");
+    $db->query('UPDATE account_data SET vp=500,dp=500 WHERE id=1');
+    $item=$db->prepare('INSERT INTO store_items (id,itemid,itemcount,name,quality,vp_price,dp_price,realm,description,icon,`group`,tooltip) VALUES (?,\'1\',\'1\',?,3,1,2,?,\'Catalogue fixture\',\'inv_misc_questionmark\',?,0)');
+    for ($i=1;$i<=65;$i++) { $id=1000+$i;$name=sprintf('Catalogue item %03d',$i);$realm=1;$group=31;$item->bind_param('isii',$id,$name,$realm,$group);$item->execute(); }
+    foreach ([2001=>[0,'Ungrouped Zero'],2002=>[null,'Literal%Sword'],2003=>[999999,'Literal_Sword'],2004=>[1,"O'Name <b>Sword</b>"]] as $id=>[$group,$name]) {
+        $realm=1;$item->bind_param('isii',$id,$name,$realm,$group);$item->execute();
     }
-    $character = $db->prepare('INSERT INTO characters (guid,name,race,gender,class,level,online) VALUES (?, ?, 1, 0, 1, 60, 0)');
-    foreach (['Literal%Name', 'Literal_Name', "O'Name", '<b>Literal</b>', 'Percent%41Name'] as $i => $name) {
-        $id = 200 + $i; $character->bind_param('is', $id, $name); $character->execute();
+    for ($i=1;$i<=3;$i++) { $id=3000+$i;$name='Second realm item '.$i;$realm=2;$group=31;$item->bind_param('isii',$id,$name,$realm,$group);$item->execute(); }
+    echo 'Seeded bounded store catalogue.';
+} elseif ($action === 'seed-online') {
+    seedArmoryFixture($db, $config);
+    seedFixtureRealm($db, $config, 2, 'Second Realm');
+    $db->select_db($config['auth']);
+    $db->query('UPDATE characters SET online=1, zone=1, account=CASE WHEN guid<=115 THEN 1 WHEN guid<=120 THEN 3 ELSE 2 END WHERE guid<=125');
+    $db->query('INSERT INTO account_access (AccountId,SecurityLevel,RealmID) VALUES (3,3,-1),(2,2,2)');
+    require_once $site . '/application/libraries/ConfigEditor.php';
+    $editor=new ConfigEditor($site . '/application/modules/online/config/online.php');$editor->set('hide_gms',true);$editor->save();
+    // The reachability check only needs a listening TCP port inside this owned fixture.
+    $db->select_db($config['cms']);
+    $port = (int) $config['dbPort']; $db->query('UPDATE realms SET realm_port=' . $port);
+    foreach ([1,2] as $realmId) file_put_contents($site . '/writable/cache/data/isOnline_' . $realmId . '.cache',json_encode(['expiration'=>time()+3600,'content'=>'yes']));
+    echo 'Seeded online realm fixtures.';
+} elseif ($action === 'online-status-stale') {
+    file_put_contents($site . '/writable/cache/data/isOnline_1.cache',json_encode(['expiration'=>time()+300,'content'=>'no']));
+} elseif ($action === 'online-player-offline') {
+    $db->select_db($config['auth']);$db->query('UPDATE characters SET online=0 WHERE guid=1');
+} elseif ($action === 'seed-dashboard') {
+    $db->select_db($config['cms']);
+    foreach (['visitor_log','daily_signups','monthly_income','monthly_votes'] as $table) $db->query('DELETE FROM `' . $table . '`');
+    $today=new DateTimeImmutable('today');$month=$today->modify('first day of this month');$previous=$month->modify('-1 month');
+    $visitor=$db->prepare('INSERT INTO visitor_log (`date`,ip,timestamp) VALUES (?,?,?)');
+    foreach ([['127.0.0.1',$today],['192.0.2.10',$today],['192.0.2.20',$today],['198.51.100.1',$today->modify('+1 day')]] as [$ip,$date]) {
+        $text=$date->format('Y-m-d');$timestamp=$date->getTimestamp();$visitor->bind_param('ssi',$text,$ip,$timestamp);$visitor->execute();
+    }
+    $signup=$db->prepare('INSERT INTO daily_signups (`date`,amount) VALUES (?,?)');
+    $entries=[$previous->format('Y-m-d')=>4,$today->format('Y-m-d')=>7,$today->modify('+1 day')->format('Y-m-d')=>99];
+    $extra=$month<$today ? 2 : 0;
+    if ($extra) {
+        $text=$month->format('Y-m-d');$ip='192.0.2.10';$timestamp=$month->getTimestamp();$visitor->bind_param('ssi',$text,$ip,$timestamp);$visitor->execute();
+        $entries[$text]=2;
+    }
+    foreach ($entries as $text=>$amount) { $signup->bind_param('si',$text,$amount);$signup->execute(); }
+    foreach (['monthly_income'=>[12,5],'monthly_votes'=>[10,4]] as $table=>[$current,$last]) {
+        $statement=$db->prepare('INSERT INTO `' . $table . '` (month,amount) VALUES (?,?)');
+        foreach ([$month->format('Y-m')=>$current,$previous->format('Y-m')=>$last,$month->modify('+1 month')->format('Y-m')=>99] as $key=>$amount) { $statement->bind_param('sd',$key,$amount);$statement->execute(); }
     }
     require_once $site . '/application/libraries/ConfigEditor.php';
-    $editor = new ConfigEditor($site . '/application/config/fusion.php'); $editor->set('cache', true); $editor->save();
-    $folder = $site . '/writable/cache/data/items';
-    if (!is_dir($folder)) mkdir($folder, 0777, true);
-    for ($id = 1; $id <= 125; $id++) file_put_contents($folder . '/item_1_' . $id . '.cache', json_encode(['expiration' => time() + 3600, 'content' => ['icon' => 'inv_misc_questionmark']]));
-    echo 'Seeded the owned Armory realm fixture.';
+    $editor=new ConfigEditor($site . '/application/config/fusion.php');$editor->set('cache',true);$editor->save();
+    echo json_encode(['signups'=>7+$extra,'visits'=>3+($extra?1:0),'unique'=>3]);
+} elseif ($action === 'change-dashboard-data') {
+    $db->select_db($config['cms']);
+    $date=date('Y-m-d');$month=date('Y-m');
+    $statement=$db->prepare('UPDATE daily_signups SET amount=amount+10 WHERE `date`=?');$statement->bind_param('s',$date);$statement->execute();
+    $statement=$db->prepare('UPDATE monthly_income SET amount=amount+5 WHERE month=?');$statement->bind_param('s',$month);$statement->execute();
+} elseif ($action === 'expire-dashboard-cache' || $action === 'expire-current-dashboard-graph') {
+    $pattern = $action === 'expire-current-dashboard-graph' ? 'dashboard_graph_v2_monthly_' . date('Y') . '_01.cache' : 'dashboard_*.cache';
+    foreach (glob($site . '/writable/cache/data/' . $pattern) as $file) {
+        $value=json_decode(file_get_contents($file),true);$value['expiration']=time()-1;file_put_contents($file,json_encode($value));
+    }
 } elseif ($action === 'seed-next-lists') {
     $db->select_db($config['auth']);
     $db->query('UPDATE guild_member SET guildid=1');

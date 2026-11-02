@@ -98,7 +98,7 @@
                                             </div>
                                             <div class="mb-2">
                                                 <h4 class="font-heading text-3xl font-bold leading-tight text-muted-800 dark:text-white">
-                                                    <span>{$income.this}</span>
+                                                    <span data-metric="income-this">{$income.this}</span>
                                                 </h4>
                                             </div>
                                             <div class="{if $income.growth >= 0}text-success-500{else}text-danger-500{/if} flex items-center gap-1 font-sans text-sm">
@@ -143,7 +143,7 @@
                                             </div>
                                             <div class="mb-2">
                                                 <h4 class="font-heading text-3xl font-bold leading-tight text-muted-800 dark:text-white">
-                                                    <span>{$votes.this}</span>
+                                                    <span data-metric="votes-this">{$votes.this}</span>
                                                 </h4>
                                             </div>
                                             <div class="{if $votes.growth >= 0}text-success-500{else}text-danger-500{/if} flex items-center gap-1 font-sans text-sm">
@@ -188,7 +188,7 @@
                                             </div>
                                             <div class="mb-2">
                                                 <h4 class="font-heading text-3xl font-bold leading-tight text-muted-800 dark:text-white">
-                                                    <span>{$signups.month}</span>
+                                                    <span data-metric="signups-month">{$signups.month}</span>
                                                 </h4>
                                             </div>
                                             <div class="text-success-500 flex items-center gap-1 font-sans text-sm">
@@ -219,17 +219,18 @@
                                             <div class="flex gap-8">
                                                 <div>
                                                     <span class="text-muted-400 font-sans text-xs">{lang('unique_this_month', 'admin')}</span>
-                                                    <p class="text-primary-500 font-sans text-lg font-medium"> {$unique.month} </p>
+                                                    <p class="text-primary-500 font-sans text-lg font-medium"> <span data-metric="unique-month">{$unique.month}</span> </p>
                                                 </div>
                                                 <div>
-                                                    <span class="text-muted-400 font-sans text-xs">{lang('views_today', 'admin')}</span>
-                                                    <p class="text-muted-800 dark:text-muted-100 font-sans text-lg font-medium"> {$views.today} </p>
+                                                    <span class="text-muted-400 font-sans text-xs">{lang('daily_visitors_today', 'admin')}</span>
+                                                    <p class="text-muted-800 dark:text-muted-100 font-sans text-lg font-medium"> <span data-metric="visits-today">{$views.today}</span> </p>
                                                 </div>
                                                 <div>
-                                                    <span class="text-muted-400 font-sans text-xs">{lang('views_this_month', 'admin')}</span>
-                                                    <p class="text-muted-800 dark:text-muted-100 font-sans text-lg font-medium"> {$views.month} </p>
+                                                    <span class="text-muted-400 font-sans text-xs">{lang('daily_visitors_this_month', 'admin')}</span>
+                                                    <p class="text-muted-800 dark:text-muted-100 font-sans text-lg font-medium"> <span data-metric="visits-month">{$views.month}</span> </p>
                                                 </div>
                                             </div>
+                                            <p id="visitor-count-note" class="text-muted-500 dark:text-muted-400 text-sm mt-3">{lang('visitor_count_note', 'admin')|escape}</p>
                                             <h2>
                                                 {lang('visitors', 'admin')}:
                                                 <small class="float-end">
@@ -287,10 +288,10 @@
         {/foreach}];
     const options = {
         series: [{
-            name: '{lang('views_of_this_year', 'admin')}',
+            name: '{lang('daily_visitors_this_year', 'admin')}',
             data: thisYearMonthlyData
         },{
-            name: '{lang('views_of_last_year', 'admin')}',
+            name: '{lang('daily_visitors_last_year', 'admin')}',
             data: lastYearMonthData
         }],
         chart: {
@@ -334,13 +335,13 @@
 
     const options2 = {
         series: [{
-            name: '{lang('views_of_this_month', 'admin')}',
+            name: '{lang('daily_visitors_this_month', 'admin')}',
             data: thisMonthDailyData
         },{
-            name: '{lang('views_of_last_month', 'admin')}',
+            name: '{lang('daily_visitors_last_month', 'admin')}',
             data: lastMonthDailyData
         },{
-            name: '{lang('views_of_two_month_ago', 'admin')}',
+            name: '{lang('daily_visitors_two_months_ago', 'admin')}',
             data: twoMonthAgoDailyData
         }],
         colors: ['#8b5cf6', '#0ea5e9', '#14b8a6'],

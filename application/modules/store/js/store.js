@@ -1,353 +1,80 @@
 var Store = {
-	/**
-	 * Filter object, holds filtering functionality
-	 */
-	Filter: {
-		 
-		showVote: true,
-		showDonate: true,
-		displayQuality: "ALL",
-		nameFilter: "",
-
-		/**
-		 * Toggle the display of voting items
-		 * @param Object element
-		 */
-		toggleVote: function(element)
-		{
-			element = $(element);
-
-			if(element.hasClass("nice_active"))
-			{
-				this.showVote = false;
-
-				$(".vp_button").each(function()
-				{
-					$(this).hide();
-				});
-
-				element.removeClass("nice_active");
-			}
-			else
-			{
-				this.showVote = true;
-				
-				$(".vp_button").each(function()
-				{
-					$(this).show();
-				});
-
-				element.addClass("nice_active");
-			}
-
-			this.filterByPriceType();
-		},
-
-		/**
-		 * Toggle the display of donation items
-		 * @param Object element
-		 */
-		toggleDonate: function(element)
-		{
-			element = $(element);
-
-			if(element.hasClass("nice_active"))
-			{
-				this.showDonate = false;
-
-				$(".dp_button").each(function()
-				{
-					$(this).hide();
-				});
-
-				element.removeClass("nice_active");
-			}
-			else
-			{
-				this.showDonate = true;
-
-				$(".dp_button").each(function()
-				{
-					$(this).show();
-				});
-
-				element.addClass("nice_active");
-			}
-
-			this.filterByPriceType();
-		},
-
-		/**
-		 * Add filter states to all items
-		 */
-		initialize: function()
-		{
-			$("#store_realms .store_item").each(function()
-		 	{
-				$(this).attr({
-					"data-filter-price": 1,
-					"data-filter-quality": 1,
-					"data-filter-name": 1
-				});
-			});
-		},
-
-		/**
-		 * Show items which data-filters are all positive
-		 */
-		filter: function()
-		{
-			var show;
-
-			$("#store_realms .store_item").each(function()
-		 	{
-		 		show = false;
-
-		 		// Did it pass all filters?
-		 		if($(this).attr("data-filter-price") == 1
-		 		&& $(this).attr("data-filter-quality") == 1
-		 		&& $(this).attr("data-filter-name") == 1)
-		 		{
-		 			show = true;
-		 		}
-
-		 		// Whether or not to show
-		 		if(show)
-		 		{
-		 			$(this).slideDown(300);
-		 		}
-		 		else
-		 		{
-					$(this).slideUp(300);
-		 		}
-		 	});
-		},
-
-		/**
-		 * Filter the items based on the price type toggles
-		 */
-		filterByPriceType: function()
-		{
-			$("#store_realms .store_item").each(function()
-		 	{
-		 		var hasVp = false;
-					hasDp = false;
-					canHide = true;
-
-		 		// Filter based on vp / dp toggling
-		 		$(this).find(".store_buttons a").each(function()
-	 			{
-	 				value = $(this).html().replace(/<.*>/, "");
-	 				price = parseInt(value.replace(/[^0-9]+/, ""));
-
-	 				if(/DP/.test(value))
-			 		{
-			 			hasDp = true;
-			 		}
-			 		else
-			 		{
-			 			hasVp = true;
-			 		}
-	 			});
-
-		 		// Does the item have VP option and is VP enabled
-	 			if(hasVp && Store.Filter.showVote && canHide)
-	 			{
-	 				canHide = false;
-	 			}
-	 			
-	 			// Does the item have DP option and is DP enabled
-	 			if(hasDp && Store.Filter.showDonate && canHide)
-	 			{
-	 				canHide = false;
-	 			}
-	 			
-	 			// Should we hide it?
-	 			if(canHide)
-	 			{
-	 				$(this).attr("data-filter-price", 0);
-	 			}
-	 			else
-	 			{
-	 				$(this).attr("data-filter-price", 1);
-	 			}
-		 	});
-
-		 	Store.Filter.filter();
-		},
-
-		/**
-		 * Filter the items based on the name matches
-		 */
-		filterByName: function()
-		{
-			var name, regex = new RegExp(this.nameFilter, "i");
-
-			$("#store_realms .store_item").each(function()
-		 	{
-		 		// Filter based on vp / dp toggling
-		 		name = $(this).find(".item_name").html();
-	 			
-	 			// Should we hide it?
-	 			if(!regex.test(name))
-	 			{
-	 				$(this).attr("data-filter-name", 0);
-	 			}
-	 			else
-	 			{
-	 				$(this).attr("data-filter-name", 1);
-	 			}
-		 	});
-
-		 	Store.Filter.filter();
-		},
-
-		/**
-		 * Change the name filter
-		 * @param String text
-		 */
-		setName: function(text)
-		{
-			text = text.replace(/[^A-Za-z0-9]+/, "");
-
-			this.nameFilter = text;
-
-			this.filterByName();
-		},
-
-		/**
-		 * Change the quality filter
-		 * @param Int value
-		 */
-		setQuality: function(value)
-		{
-			this.displayQuality = value;
-
-			this.filterByQuality();
-		},
-
-		/**
-		 * Filter the items based on their item quality
-		 */
-		filterByQuality: function()
-		{
-			$("#store_realms .store_item").each(function()
-		 	{
-		 		if(Store.Filter.displayQuality == "ALL")
-		 		{
-		 			$(this).attr("data-filter-quality", 1);
-		 		}
-		 		else
-		 		{
-		 			// Filter based on vp / dp toggling
-			 		item = $(this).find(".item_name");
-		 			
-		 			// Should we hide it?
-		 			if(item.hasClass("q" + Store.Filter.displayQuality))
-		 			{
-		 				$(this).attr("data-filter-quality", 1);
-		 			}
-		 			else
-		 			{
-		 				$(this).attr("data-filter-quality", 0);
-		 			}
-		 		}
-		 	});
-
-		 	Store.Filter.filter();
-		},
-
-		/**
-		 * Sort the items
-		 * @param String value
-		 */
-		sort: function(value)
-		{
-			if(typeof Store.Filter.Sorting[value] != "undefined")
-			{
-				// Loop through all groups
-				$('#store_realms .item_group').each(function()
-				{
-					// Sort the items with in them
-					$(this).find('.store_item').sortElements(Store.Filter.Sorting[value]);
-				});
-
-				// Sort all direct child elements (in other words; not in groups)
-				$('#store_realms > .store_item').sortElements(Store.Filter.Sorting[value]);
-			}
-		},
-
-		/**
-		 * Holds all sorting algorithms
-		 */
-		Sorting: {
-
-			standard: function(a, b)
-			{
-				return parseInt($(a).attr("id").replace("item_", "")) > parseInt($(b).attr("id").replace("item_", "")) ? 1 : -1;
-			},
-
-			name: function(a, b)
-			{
-				return $(a).find(".item_name").html() > $(b).find(".item_name").html() ? 1 : -1;
-			},
-
-			priceVp: function(a, b)
-			{
-				return $(a).find(".vp_price_value").html() > $(b).find(".vp_price_value").html() ? 1 : -1;
-			},
-
-			priceDp: function(a, b)
-			{
-				return $(a).find(".dp_price_value").html() > $(b).find(".dp_price_value").html() ? 1 : -1;
-			},
-
-			quality: function(a, b)
-			{
-				return parseInt($(a).find(".item_name").attr("class").replace("item_name q", "")) < parseInt($(b).find(".item_name").attr("class").replace("item_name q", "")) ? 1 : -1;
-			}
-		},
-
-		/**
-		 * Fade out buttons of items which the user can't afford
-		 */
-		 updatePrices: function()
-		 {
-		 	var value, price;
-
-		 	$("#store_realms .store_item").each(function()
-		 	{
-		 		$(this).find(".store_buttons a").each(function()
-	 			{
-	 				value = $(this).html().replace(/<.*>/, "");
-	 				price = parseInt(value.replace(/[^0-9]+/, ""));
-
-	 				if(/DP/.test(value))
-			 		{
-			 			if(price > Store.Customer.dp)
-			 			{
-			 				$(this).fadeTo(300, 0.5);
-			 			}
-			 			else
-			 			{
-			 				$(this).fadeTo(300, 1);
-			 			}
-			 		}
-			 		else
-			 		{
-			 			if(price > Store.Customer.vp)
-			 			{
-			 				$(this).fadeTo(300, 0.5);
-			 			}
-			 			else
-			 			{
-			 				$(this).fadeTo(300, 1);
-			 			}
-			 		}
-	 			});
-		 	});
-		 }
-	},
+    escape: function(value) { return String(value == null ? '' : value).replace(/[&<>"']/g, function(c) { return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]; }); },
+    Catalogue: {
+        request: null, generation: 0, next: null, filters: null, initialized: false,
+        initialize: function() {
+            if (this.initialized) return;
+            this.initialized = true;
+            var next = $('#store_realms').attr('data-next');
+            this.next = next === '' ? null : Number(next);
+            this.filters = this.capture();
+            $('#store_realms').on('click.catalogue', '[data-catalogue-add]', function() {
+                var button = $(this);
+                Store.Cart.add(Number(button.attr('data-id')), button.attr('data-item-id'), button.attr('data-name'), Number(button.attr('data-price')),
+                    button.attr('data-price-type'), button.attr('data-realm-name'), Number(button.attr('data-realm')), Number(button.attr('data-quality')), Number(button.attr('data-tooltip')));
+            });
+            Store.Filter.updatePrices();
+        },
+        capture: function() {
+            var fields = {}; $('#catalogue-filter').serializeArray().forEach(function(field) { fields[field.name] = field.value; });
+            fields.name = String(fields.name || '').trim();
+            return fields;
+        },
+        busy: function(value) {
+            $('#store_realms').attr('aria-busy', String(value));
+            $('#catalogue-filter :submit, #catalogue-more, #store_realms [data-catalogue-add]').prop('disabled', value);
+        },
+        realmChanged: function() {
+            $('#catalogue-group').empty().append($('<option>').val('all').text(lang('catalogue_all_groups','store')));
+            this.reload();
+        },
+        reload: function() { this.filters = this.capture(); this.next = null; this.fetch(false); },
+        loadMore: function() { if (this.next !== null && !this.request) this.fetch(true); },
+        groups: function(groups, selected) {
+            var select = $('#catalogue-group').empty().append($('<option>').val('all').text(lang('catalogue_all_groups','store'))), found = selected === 'all';
+            groups.forEach(function(group) { select.append($('<option>').val(group.id).text(group.title)); if (String(group.id) === String(selected)) found = true; });
+            if (!found) select.append($('<option>').val(selected).text(lang('catalogue_missing_group','store')));
+            select.val(String(selected));
+        },
+        fetch: function(append) {
+            if (!this.filters.realm) return;
+            var generation = ++this.generation, filter = Object.assign({}, this.filters), offset = append ? this.next : 0;
+            if (this.request) this.request.abort();
+            this.busy(true); $('#catalogue-error').prop('hidden', true).text('');
+            $('#catalogue-status').text(lang('catalogue_loading','store'));
+            if (!append) { $('#store_realms').empty(); $('#catalogue-more').prop('hidden', true); $('#catalogue-empty').prop('hidden', true); }
+            var xhr = $.ajax({url: Config.URL+'store/catalogue', method:'POST', dataType:'json', data:Object.assign(filter, {offset:offset, limit:25, csrf_token_name:Config.CSRF})})
+                .done(function(result) {
+                    if (generation !== Store.Catalogue.generation) return;
+                    if (append) $('#store_realms').append(result.html); else $('#store_realms').html(result.html);
+                    Store.Catalogue.next = result.next;
+                    Store.Catalogue.groups(result.groups, $('#catalogue-group').val() || filter.group);
+                    var loaded = $('#store_realms [data-catalogue-id]').length;
+                    $('#catalogue-status').text(lang('catalogue_progress','store').replace('{0}', loaded).replace('{1}', result.total));
+                    $('#catalogue-empty').prop('hidden', result.total !== 0);
+                    $('#catalogue-more').prop('hidden', result.next === null);
+                    Store.Filter.updatePrices(); Tooltip.refresh();
+                }).fail(function(xhr, status) {
+                    if (status === 'abort' || generation !== Store.Catalogue.generation) return;
+                    $('#catalogue-status').text('');
+                    $('#catalogue-error').text(lang(append?'catalogue_more_failed':'catalogue_failed','store')).prop('hidden', false);
+                    if (append) $('#catalogue-more').prop('hidden', false);
+                }).always(function() {
+                    if (generation !== Store.Catalogue.generation) return;
+                    Store.Catalogue.request = null; Store.Catalogue.busy(false);
+                });
+            this.request = xhr;
+        }
+    },
+    Filter: {
+        initialize: function() { Store.Catalogue.initialize(); },
+        updatePrices: function() {
+            $('#store_realms [data-catalogue-add]').each(function() {
+                var button = $(this), price = Number(button.attr('data-price')), currency = button.attr('data-price-type');
+                button.css('opacity', price > Store.Customer[currency] ? 0.5 : 1);
+            });
+        }
+    },
 
 	/**
 	 * Customer object, holds economical values
@@ -440,8 +167,9 @@ var Store = {
 		 */
 		add: function(id, itemId, name, price, priceType, realm, realmId, quality, tooltip)
 		{
-			name = name.replace(/\//, "");
-			realm = realm.replace(/\//, "");
+			name = Store.escape(name);
+			realm = Store.escape(realm);
+            itemId = Store.escape(itemId);
 
 			Store.Customer.subtract(price, priceType, function()
 			{
@@ -666,7 +394,7 @@ var Store = {
 				confirmButtonText: lang("yes", "store")
 			}).then((result) => {
 			if (result.isConfirmed) {
-				$("[data-id]").attr("data-available", "1");
+				$("#checkout select[data-id]").attr("data-available", "1");
 
 				for(i in Store.Cart.list)
 				{
@@ -675,7 +403,7 @@ var Store = {
 						delete Store.Cart.list[i]["character"];
 					}
 
-					$("[data-id=\"" + Store.Cart.list[i].id + "\"]").each(function()
+					$("#checkout select[data-id=\"" + Store.Cart.list[i].id + "\"]").each(function()
 					{
 						if($(this).attr("data-available") == "1"
 						&& typeof Store.Cart.list[i].character == "undefined")

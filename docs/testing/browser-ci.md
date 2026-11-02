@@ -1,6 +1,6 @@
-# Authentication and donation browser tests
+# Browser and database tests
 
-The browser suite starts the real FusionCMS application and drives its normal login, remember-me, password recovery, account settings and donation forms. GitHub CI runs it on PHP 8.3.36, 8.4.27 and 8.5.12, with Chromium at desktop and Pixel 7 viewport sizes.
+The browser suite starts the real FusionCMS application and checks account forms, donations, public lists, the store and admin pages. GitHub CI runs it on PHP 8.3.36, 8.4.27 and 8.5.12, with Chromium at desktop and Pixel 7 viewport sizes.
 
 ## What it covers
 
@@ -101,5 +101,19 @@ Admin asset browser checks visit basic log pages, account search, the dashboard,
 Armory browser checks use a realm inside the owned disposable auth schema, with 125 characters, items and guilds. They cover page boundaries, literal wildcard searches, empty guilds, malformed requests, escaped result names and retry after a failed request. `php tests/armory_search_test.php` exercises the real query builder with Trinity and VMaNGOS column maps on SQLite and the optional loopback MySQL server. MySQL runs with `ONLY_FULL_GROUP_BY`; query checks verify one character query per page and member aggregation restricted to the current guild page.
 
 Open `output/playwright/report/index.html` for the HTML report. Failed tests retain screenshots, video and traces in `output/playwright/results`. PHP and RPC diagnostics are in `output/playwright/logs`. GitHub uploads those directories as a separate artifact for each PHP version, retained for seven days.
+
+## Store, online players, dashboard and account settings
+
+The store starts with 25 items from the first realm. Players can choose a realm, group, quality, currency or sort order, search by name, and load another page without losing their cart. Items whose group was removed remain under Ungrouped. The bundled store now uses a group selector instead of collapsible groups; `minimize_groups_by_default` still exists for older or custom templates. Catalogue requests read current prices directly, so an admin price change does not wait for a catalogue cache to expire.
+
+Online players use server pages with a maximum of 100 rows per request. Staff exclusions follow the configured emulator mapping and include global grants and grants for the selected realm. The normal ten-row pages can be cached for 30 seconds; Refresh bypasses that cache. Searches do not create cache entries. Failed requests leave a retry control, and changing realms cancels an older request before its results can replace the new realm.
+
+Dashboard totals use calendar months, including February and year changes. Monthly signups add every daily signup row. A visitor IP counts once per day: the monthly unique figure counts that IP once for the month, while monthly daily visitors add its separate days. These figures are not pageviews. Current totals, account counts and current graphs refresh after at most 60 seconds when caching is enabled. Historical graphs use separate period keys and a one-day cache.
+
+Account settings preserve drafts after a failed save, show errors beside the relevant field and prevent duplicate submissions. Shared confirmation dialogs support keyboard focus, Tab, Escape, cancellation and focus restoration in both bundled themes. Password changes retain the existing session and remembered-login revocation behavior.
+
+Run `php tests/store_catalogue_test.php`, `php tests/online_players_test.php` and `php tests/dashboard_totals_test.php` for the model checks. They use SQLite by default and add guarded disposable MySQL schemas when the loopback test variables above are set. Coverage includes literal search characters, matching counts and pages, staff scopes, calendar boundaries, future-dated rows and a fixed number of database queries. No game database schema changes are required.
+
+The matching browser files are `store_catalogue.spec.cjs`, `online_players.spec.cjs`, `dashboard_totals.spec.cjs` and `ucp_modals.spec.cjs`. They run on desktop and mobile with real controllers, templates and database fixtures. Tests cover cart preservation, malformed requests, stale responses, retry, cache refresh, escaped names, settings drafts and modal keyboard controls. Existing password-change tests continue to check session revocation.
 
 The runtime manifest, generated configuration and ephemeral TLS private key are excluded from CI artifact uploads and Git. If the runner is forcibly terminated, its terminal output and temporary fixture configuration can help identify the remaining test resources; cleanup must still check fixture ownership before dropping a database.

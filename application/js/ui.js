@@ -20,7 +20,7 @@ function UI()
 		Tooltip.initialize();
 
 		$.ajaxSetup({ beforeSend: function(jqXHR, settings) {
-			if(typeof settings.data === 'object')
+			if(settings.data && typeof settings.data === 'object' && typeof settings.data.append === 'function')
 				settings.data.append('csrf_token_name', getCookie('csrf_cookie_name'));
 
 			if(typeof settings.data === 'string')
@@ -39,149 +39,97 @@ function UI()
 		}); // renew CSRF field value, automatically
 	}
 
-	/**
-	 * Display the vote reminder popup
-	 */
-	this.voteReminder = function()
-	{
-		// Show box
-		$("#popup_bg").fadeTo(200, 0.5);
-		$("#vote_reminder").fadeTo(200, 1);
+    var popup = null;
 
-		// Assign hide-function to background
-		$("#popup_bg").bind('click', function()
-		{
-			UI.hidePopup();
-		});
-	}
+    function focusable(dialog) {
+        return dialog.find('a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])')
+            .filter(':visible').filter(function() { return !this.inert && this.getAttribute('aria-disabled') !== 'true'; });
+    }
 
-	/**
-	 * Shows an alert box
-	 * @param String message
-	 */
-	this.alert = function(question, time)
-	{		
-		// Put question and button text
-		$("#alert_message").html(question);
+    function closePopup(cancelled, restoreFocus) {
+        var state = popup;
+        popup = null;
+        if (state) {
+            clearTimeout(state.timer);
+            state.dialog.css({width:state.width, marginLeft:state.margin}).attr('aria-hidden', 'true');
+            state.inert.forEach(function(entry) { entry.node.inert = entry.before; });
+            document.body.style.overflow = state.overflow;
+        }
+        $('#popup_bg, #confirm, #alert, #vote_reminder').stop(true, true).hide();
+        $('#popup_bg, #confirm_button, #confirm_hide, #alert_button').off('.fusionPopup');
+        $(document).off('.fusionPopup');
+        if (state && restoreFocus !== false && state.origin && state.origin.isConnected && typeof state.origin.focus === 'function') state.origin.focus();
+        if (state && cancelled && typeof state.cancel === 'function') state.cancel();
+    }
 
-		// Show box
-		$("#popup_bg").fadeTo(200, 0.5);
-		$("#alert").fadeTo(200, 1);
+    function openPopup(id, cancel, width) {
+        var origin = popup ? popup.origin : document.activeElement;
+        closePopup(true, false);
+        var dialog = $('#' + id);
+        if (!dialog.length) return null;
+        var state = {dialog:dialog, origin:origin, cancel:cancel, inert:[], overflow:document.body.style.overflow,
+            width:dialog[0].style.width, margin:dialog[0].style.marginLeft};
+        popup = state;
+        dialog.attr({role:'dialog', 'aria-modal':'true', 'aria-hidden':'false', tabindex:'-1'}).stop(true, true).show();
+        var question = id === 'confirm' ? $('#confirm_question') : $('#alert_message');
+        if (question.length && question.text().trim()) dialog.attr('aria-labelledby', question.attr('id')).removeAttr('aria-label');
+        else dialog.removeAttr('aria-labelledby').attr('aria-label', dialog.attr('aria-label') || $('#confirm_button').text() || document.title);
+        if (Number(width) > 0) {
+            var fit = Math.min(Number(width), Math.max(240, window.innerWidth - 32));
+            dialog.css({width:fit+'px', marginLeft:-(fit/2)+'px'});
+        }
+        var background = document.getElementById('popup_bg'), branch = dialog[0];
+        while (branch.parentElement && branch.parentElement !== document.documentElement) {
+            var parent = branch.parentElement;
+            Array.prototype.forEach.call(parent.children, function(node) {
+                if (node === branch || node === background || node.contains(background) || /^(SCRIPT|STYLE|LINK)$/.test(node.tagName)) return;
+                state.inert.push({node:node, before:node.inert}); node.inert = true;
+            });
+            if (parent === document.body) break;
+            branch = parent;
+        }
+        document.body.style.overflow = 'hidden';
+        $('#popup_bg').stop(true, true).show().css('opacity', 0.5).on('click.fusionPopup', function() { if (popup === state) closePopup(true); });
+        $('#confirm_hide, #alert_button').on('click.fusionPopup', function(event) { event.preventDefault(); if (popup === state) closePopup(true); });
+        $(document).on('keydown.fusionPopup', function(event) {
+            if (popup !== state) return;
+            if (event.key === 'Escape') { event.preventDefault(); event.stopPropagation(); closePopup(true); return; }
+            if (event.key === 'Enter' && !$(event.target).is('button, a[href]')) { event.preventDefault(); return; }
+            if (event.key !== 'Tab') return;
+            var controls = focusable(dialog), first = controls[0], last = controls[controls.length - 1];
+            if (!first) { event.preventDefault(); dialog[0].focus(); }
+            else if (event.shiftKey && (document.activeElement === first || !$.contains(dialog[0], document.activeElement))) { event.preventDefault(); last.focus(); }
+            else if (!event.shiftKey && (document.activeElement === last || document.activeElement === dialog[0])) { event.preventDefault(); first.focus(); }
+        }).on('focusin.fusionPopup', function(event) {
+            if (popup === state && event.target !== dialog[0] && !$.contains(dialog[0], event.target)) (focusable(dialog)[0] || dialog[0]).focus();
+        });
+        var input = dialog.find('[autofocus], input:not([disabled]), textarea:not([disabled]), select:not([disabled])').filter(':visible')[0];
+        (input || (id === 'confirm' ? document.getElementById('confirm_hide') : focusable(dialog)[0]) || dialog[0]).focus();
+        return state;
+    }
 
-		if(typeof time == "undefined")
-		{
-			$("#alert_message").css({marginBottom:"10px"});
-			$(".popup_links").show();
+    this.voteReminder = function() { openPopup('vote_reminder'); };
 
-			// Assign click event
-			$("#alert_button").bind('click', function()
-			{
-				UI.hidePopup();	
-			});
-		}
-		else
-		{
-			$("#alert_message").css({marginBottom:"0px"});
-			$(".popup_links").hide();
+    /** Trusted HTML remains supported for existing messages and input prompts. */
+    this.alert = function(question, time) {
+        $('#alert_message').html(question);
+        var state = openPopup('alert');
+        if (state && Number(time) >= 0) state.timer = setTimeout(function() { if (popup === state) closePopup(false); }, Number(time));
+    };
 
-			setTimeout(function()
-			{
-				UI.hidePopup();
-			}, time);
-		}
+    this.confirm = function(question, button, callback, callback_cancel, width) {
+        $('#confirm_question').html(question); $('#confirm_button').html(button);
+        var state = openPopup('confirm', callback_cancel, width);
+        if (!state) return;
+        $('#confirm_button').on('click.fusionPopup', function(event) {
+            event.preventDefault();
+            if (popup !== state) return;
+            closePopup(false);
+            if (typeof callback === 'function') callback();
+        });
+    };
 
-		// Assign hide-function to background
-		$("#popup_bg").bind('click', function()
-		{
-			UI.hidePopup();
-		});
-
-		// Assign key events
-		$(document).keypress(function(event)
-		{
-			// If "enter"
-			if(event.which == 13)
-			{
-				UI.hidePopup();
-			}
-		});
-	}
-
-	/**
-	 * Shows a confirm box
-	 * @param String question
-	 * @param String button
-	 * @param Function callback
-	 * @param Int width
-	 */
-	this.confirm = function(question, button, callback, callback_cancel, width)
-	{
-		var normalWidth = $("#confirm").css("width");
-		var normalMargin = $("#confirm").css("margin-left");
-
-		if(width)
-		{
-			$("#confirm").css({width: width+"px"});
-			$("#confirm").css({marginLeft: "-"+(width/2)+"px"});
-		}
-
-		$(".popup_links").show();
-		
-		// Put question and button text
-		$("#confirm_question").html(question);
-		$("#confirm_button").html(button);
-
-		// Show box
-		$("#popup_bg").fadeTo(200, 0.5);
-		$("#confirm").fadeTo(200, 1);
-
-		// Assign click event
-		$("#confirm_button").bind('click', function()
-		{
-			$("#confirm").css({width:normalWidth});
-			$("#confirm").css({marginLeft:normalMargin});
-			callback();
-			UI.hidePopup();	
-		});
-
-		// Assign hide-function to background
-		$("#popup_bg").bind('click', function()
-		{
-			$("#confirm").css({width:normalWidth});
-			$("#confirm").css({marginLeft:normalMargin});
-			UI.hidePopup();
-		});
-
-		// Assign key events
-		$(document).keypress(function(event)
-		{
-			// If "enter"
-			if(event.which == 13)
-			{
-				$("#confirm").css({width:normalWidth});
-				$("#confirm").css({marginLeft:normalMargin});
-				callback();
-				UI.hidePopup();
-			}
-		});
-	}
-
-	/**
-	 * Hides the current popup box
-	 */
-	this.hidePopup = function()
-	{
-		// Hide box
-		$("#popup_bg").hide();
-		$("#confirm").hide();
-		$("#alert").hide();
-		$("#vote_reminder").hide();
-
-		// Remove events
-		$("#confirm_button").unbind('click');
-		$("#alert_button").unbind('click');
-		$(document).unbind('keypress');
-	}
+    this.hidePopup = function() { closePopup(true); };
 
 	/**
 	 * Display the amount of remaining characters

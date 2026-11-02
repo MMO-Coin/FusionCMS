@@ -55,7 +55,7 @@ $lang['new_password_confirm'] = "Confirmar contraseña";
 $lang['new_password_submit'] = "Cambiar contraseña";
 
 $lang['nickname_error'] = "El apodo debe tener entre 4 y 14 caracteres y solo puede contener letras y números";
-$lang['location_error'] = "La ubicación solo puede tener hasta 32 caracteres y solo puede contener letras";
+$lang['location_error'] = "La ubicación debe tener un máximo de 32 caracteres.";
 $lang['pw_doesnt_match'] = "¡Las contraseñas no coinciden!";
 $lang['changes_saved'] = "¡Los cambios han sido guardados!";
 $lang['invalid_pw'] = "¡Contraseña incorrecta!";
@@ -91,4 +91,7 @@ $lang['amount'] = 'Cantidad';
 $lang['ip'] = 'IP';
 $lang['today'] = 'Hoy';
 $lang['yesterday'] = 'Ayer';
-
+$lang['settings_saving'] = "Guardando cambios...";
+$lang['settings_failed'] = "No se pudieron guardar los cambios. Tus datos siguen aquí. Inténtalo de nuevo.";
+$lang['settings_reload'] = "Recargar para usar el nuevo idioma";
+$lang['website_language'] = "Idioma del sitio";

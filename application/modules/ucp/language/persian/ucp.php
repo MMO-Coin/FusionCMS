@@ -55,7 +55,7 @@ $lang['new_password_confirm'] = "تایید رمز عبور";
 $lang['new_password_submit'] = "رمز عبور را تغییر دهید";
 
 $lang['nickname_error'] = "نام مستعار باید بین 4 تا 14 کاراکتر باشد و باید فقط شامل حروف و اعداد باشد";
-$lang['location_error'] = "مکان ممکن است فقط حداکثر 32 کاراکتر داشته باشد و فقط شامل حروف باشد";
+$lang['location_error'] = "موقعیت باید حداکثر ۳۲ نویسه باشد.";
 $lang['pw_doesnt_match'] = "گذرواژه ها مطابقت ندارند!";
 $lang['changes_saved'] = "تغییرات ذخیره شده است!";
 $lang['invalid_pw'] = "رمز عبور اشتباه است!";
@@ -91,3 +91,7 @@ $lang['amount'] = 'مقدار';
 $lang['ip'] = 'آی‌پی';
 $lang['today'] = 'امروز';
 $lang['yesterday'] = 'دیروز';
+$lang['settings_saving'] = "در حال ذخیره تغییرات...";
+$lang['settings_failed'] = "ذخیره تغییرات ممکن نیست. اطلاعات شما حفظ شده است. دوباره تلاش کنید.";
+$lang['settings_reload'] = "بارگذاری دوباره برای استفاده از زبان جدید";
+$lang['website_language'] = "زبان وب‌سایت";

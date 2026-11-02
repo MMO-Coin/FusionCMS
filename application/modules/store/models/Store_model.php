@@ -4,20 +4,66 @@ require_once dirname(__DIR__, 3) . '/libraries/PageBounds.php';
 
 class Store_model extends CI_Model
 {
-    public function getItems($realm)
+    /** Legacy callers receive a bounded catalogue page, including ungrouped items. */
+    public function getItems($realm, $offset = 0, $limit = 25): array
     {
-        $query = $this->db->query("SELECT DISTINCT store_items.*
-									FROM store_items
-									INNER JOIN store_groups ON store_items.group = store_groups.id
-									WHERE store_items.realm = ?
-									GROUP BY store_items.id
-									ORDER BY store_groups.orderNumber ASC, store_items.group ASC, store_items.id ASC;", [$realm]);
+        return $this->getCatalogueItems($realm, [], $offset, $limit);
+    }
 
-        if ($query->getNumRows() > 0) {
-            return $query->getResultArray();
-        } else {
-            return false;
+    private function catalogueQuery($realm, array $filters)
+    {
+        $realm = filter_var($realm, FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]);
+        $group = $filters['group'] ?? 'all'; $quality = $filters['quality'] ?? 'ALL';
+        $currency = $filters['currency'] ?? 'all'; $name = $filters['name'] ?? ''; $sort = $filters['sort'] ?? 'standard';
+        if (!$realm || (!is_int($group) && !is_string($group)) || ($group !== 'all' && filter_var($group, FILTER_VALIDATE_INT, ['options' => ['min_range' => 0]]) === false)
+            || (!is_int($quality) && !is_string($quality)) || ($quality !== 'ALL' && !in_array((string) $quality, ['0','1','2','3','4','5','6','7'], true))
+            || !in_array($currency, ['all', 'vp', 'dp'], true) || !is_string($name) || mb_strlen($name) > 100
+            || !in_array($sort, ['standard','name','priceVp','priceDp','quality'], true)) return null;
+        $builder = $this->db->table('store_items s')->join('store_groups g', 's.group = g.id', 'left')->where('s.realm', $realm);
+        if ($group !== 'all') {
+            if ((int) $group === 0) $builder->groupStart()->where('s.group', 0)->orWhere('g.id', null)->groupEnd();
+            else $builder->where('g.id', (int) $group);
         }
+        if ($quality !== 'ALL') $builder->where('s.quality', (int) $quality);
+        if ($currency !== 'all') $builder->where('s.' . $currency . '_price >', 0);
+        $name = trim($name);
+        if ($name !== '') {
+            $escape = $this->db->likeEscapeChar;
+            $name = strtr($name, [$escape => $escape . $escape, '%' => $escape . '%', '_' => $escape . '_']);
+            $builder->like('s.name', $name, 'both', true);
+        }
+        return $builder;
+    }
+
+    public function getCatalogueItems($realm, array $filters = [], $offset = 0, $limit = 25): array
+    {
+        $bounds = PageBounds::bounds($offset, $limit);
+        if (!$bounds || !($builder = $this->catalogueQuery($realm, $filters))) return [];
+        $sort = $filters['sort'] ?? 'standard';
+        if ($sort === 'name') $builder->orderBy('s.name', 'ASC');
+        elseif ($sort === 'priceVp') $builder->orderBy('s.vp_price', 'ASC');
+        elseif ($sort === 'priceDp') $builder->orderBy('s.dp_price', 'ASC');
+        elseif ($sort === 'quality') $builder->orderBy('s.quality', 'DESC');
+        else $builder->orderBy('g.id IS NULL', 'ASC', false)->orderBy('g.orderNumber', 'ASC')->orderBy('g.id', 'ASC');
+        // Catalogue responses never carry delivery queries or console commands into the page.
+        return $builder->select('s.id, s.itemid, s.itemcount, s.name, s.quality, s.vp_price, s.dp_price, s.realm, s.description, s.icon, s.tooltip')
+            ->orderBy('s.id', 'ASC')->limit($bounds[1], $bounds[0])->get()->getResultArray();
+    }
+
+    public function countCatalogueItems($realm, array $filters = []): int
+    {
+        $builder = $this->catalogueQuery($realm, $filters);
+        return $builder ? $builder->countAllResults() : 0;
+    }
+
+    public function getCatalogueGroups($realm): array
+    {
+        $realm = filter_var($realm, FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]);
+        if (!$realm) return [];
+        return $this->db->table('store_items s')->select('g.id, g.title, g.orderNumber')
+            ->join('store_groups g', 's.group = g.id', 'left')->where('s.realm', $realm)
+            ->groupBy('g.id, g.title, g.orderNumber')->orderBy('g.id IS NULL', 'ASC', false)
+            ->orderBy('g.orderNumber', 'ASC')->orderBy('g.id', 'ASC')->get()->getResultArray();
     }
 
     public function getItem($id)

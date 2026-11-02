@@ -55,7 +55,7 @@ $lang['new_password_confirm'] = "Confirmer le mot de passe";
 $lang['new_password_submit'] = "Changer le mot de passe";
 
 $lang['nickname_error'] = "Le pseudo doit comporter entre 4 et 14 caractères et ne peut contenir que des lettres et des chiffres";
-$lang['location_error'] = "Le lieu ne peut contenir que jusqu'à 32 caractères et ne peut contenir que des lettres";
+$lang['location_error'] = "L’emplacement doit contenir au maximum 32 caractères.";
 $lang['pw_doesnt_match'] = "Les mots de passe ne correspondent pas !";
 $lang['changes_saved'] = "Les modifications ont été enregistrées !";
 $lang['invalid_pw'] = "Mot de passe incorrect !";
@@ -91,3 +91,7 @@ $lang['amount'] = 'Montant';
 $lang['ip'] = 'IP';
 $lang['today'] = 'Aujourd\'hui';
 $lang['yesterday'] = 'Hier';
+$lang['settings_saving'] = "Enregistrement...";
+$lang['settings_failed'] = "Impossible d’enregistrer. Vos saisies sont conservées. Réessayez.";
+$lang['settings_reload'] = "Recharger pour utiliser la nouvelle langue";
+$lang['website_language'] = "Langue du site";

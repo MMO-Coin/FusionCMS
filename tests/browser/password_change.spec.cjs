@@ -1,4 +1,4 @@
-const {test, expect, login, openPage, blockExternal, fixture, snapshot} = require('./helpers.cjs');
+const {test, expect, login, openPage, blockExternal, fixture, snapshot, verify} = require('./helpers.cjs');
 
 async function device(browser, baseURL) {
     const {viewport, isMobile, hasTouch, deviceScaleFactor, userAgent} = test.info().project.use;
@@ -18,6 +18,14 @@ async function denied(page) {
 async function change(page, oldPassword, newPassword) {
     // Reload the actual form for each attempt, including its current CSRF token.
     await openPage(page, '/ucp/settings');
+    if (newPassword.length < 6) {
+        await expect(page.locator('#new_password')).toHaveAttribute('minlength', '6');
+        const response = await verify(page, '/ucp/settings/submit', {old_password:oldPassword, new_password:newPassword});
+        expect(response.status()).toBe(200);
+        const result = await response.json();
+        expect(result.errors).toHaveProperty('new_password');
+        return result;
+    }
     await page.locator('#old_password').fill(oldPassword);
     await page.locator('#new_password').fill(newPassword);
     await page.locator('#new_password_confirm').fill(newPassword);
@@ -26,9 +34,14 @@ async function change(page, oldPassword, newPassword) {
     const response = await sent;
     expect(response.status()).toBe(200);
     const result = await response.json();
-    await expect(page.locator('.swal2-popup')).toBeVisible();
-    await page.locator('.swal2-confirm').click();
-    if (result.status === 'success') await expect(page).toHaveURL(/\/login$/);
+    if (result.status === 'success') {
+        await expect(page.locator('.swal2-popup')).toBeVisible();
+        await page.locator('.swal2-confirm').click();
+        await expect(page).toHaveURL(/\/login$/);
+    } else {
+        await expect(page.locator('#old_password')).toHaveAttribute('aria-invalid', 'true');
+        await expect(page.locator('#old_password_error')).toBeVisible();
+    }
     return result;
 }
 async function rejectOldPassword(page) {

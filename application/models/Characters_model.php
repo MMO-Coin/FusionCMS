@@ -4,6 +4,8 @@ use CodeIgniter\Database\BaseConnection;
 use CodeIgniter\Database\ResultInterface;
 use MX\CI;
 
+require_once dirname(__DIR__) . '/libraries/PageBounds.php';
+
 /**
  * @package FusionCMS
  * @author  Jesper Lindström
@@ -122,6 +124,38 @@ class Characters_model
     public function getOnlinePlayers(bool $removeGMs = false): false|array
     {
         return $this->getCharacters(columns("characters", ["guid", "account", "name", "race", "class", "gender", "level", "zone"], $this->realmId), [column("characters", "online", false, $this->realmId) => 1], $removeGMs);
+    }
+
+    private function onlinePlayerQuery(string $search, array $excludedAccounts)
+    {
+        if (mb_strlen($search) > 100) return null;
+        $this->connect();
+        $builder = $this->db->table(table('characters', $this->realmId))
+            ->where(column('characters', 'online', false, $this->realmId), 1);
+        if ($search !== '') {
+            $escape = $this->db->likeEscapeChar;
+            $literal = strtr($search, [$escape => $escape . $escape, '%' => $escape . '%', '_' => $escape . '_']);
+            $builder->like(column('characters', 'name', false, $this->realmId), $literal, 'both', true);
+        }
+        $excludedAccounts = array_values(array_unique(array_filter(array_map('intval', $excludedAccounts), static fn($id) => $id > 0)));
+        if ($excludedAccounts) $builder->whereNotIn(column('characters', 'account', false, $this->realmId), $excludedAccounts);
+        return $builder;
+    }
+
+    public function getOnlinePlayerCount(string $search = '', array $excludedAccounts = []): int
+    {
+        $builder = $this->onlinePlayerQuery($search, $excludedAccounts);
+        return $builder ? $builder->countAllResults() : 0;
+    }
+
+    public function getOnlinePlayerPage($offset = 0, $limit = 10, string $search = '', array $excludedAccounts = []): array
+    {
+        $bounds = PageBounds::bounds($offset, $limit);
+        if (!$bounds || !($builder = $this->onlinePlayerQuery($search, $excludedAccounts))) return [];
+        return $builder->select(columns('characters', ['guid', 'name', 'race', 'class', 'gender', 'level', 'zone'], $this->realmId))
+            ->orderBy(column('characters', 'name', false, $this->realmId), 'ASC')
+            ->orderBy(column('characters', 'guid', false, $this->realmId), 'ASC')
+            ->limit($bounds[1], $bounds[0])->get()->getResultArray();
     }
 
     /**
