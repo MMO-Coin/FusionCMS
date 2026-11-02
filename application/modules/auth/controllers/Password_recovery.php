@@ -23,6 +23,7 @@ class Password_recovery extends MX_Controller
         $this->load->library('FusionCaptcha');
 
         $this->user->guestArea();
+        clientLang('request_failed', 'auth');
 
         requirePermission("view");
 

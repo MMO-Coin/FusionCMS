@@ -1,134 +1,61 @@
-var Recovery = {	
-	timeout: null,
-	useCaptcha: false,
-	useRecaptcha: false,
-	useRecaptcha3: false,
-	useFusionCaptcha: false,
-
-	request: function() {
-		var postData = {
-			"email": $(".email-input").val(),
-			"captcha": $(".captcha-input").val(),
-		};
-
-		var fields = [
-			"email"
-		];
-
-		if(Recovery.useCaptcha) {
-			fields.push("captcha");
-		}
-
-		if(Recovery.useRecaptcha) {
-			postData["recaptcha"] = grecaptcha.getResponse();
-		}
-
-		if(Recovery.useRecaptcha3) {
-			postData["recaptcha"] = $(".g-recaptcha-response").val();
-		}
-
-		if(Recovery.useFusionCaptcha) {
-			postData["cap-token"] = $('input[name="cap-token"]').val();
-		}
-
-		clearTimeout (Recovery.timeout);
-		Recovery.timeout = setTimeout (function()
-		{
-			$.post(Config.URL + "password_recovery/create_request", postData, function(data) {
-				try {
-					data = JSON.parse(data);
-
-					if(data["showCaptcha"] === true) {
-						$(".captcha-field").removeClass("d-none");
-					}
-
-					if (Recovery.useFusionCaptcha && data.captcha_error === true) {
-						Recovery.resetFusionCaptcha();
-					}
-
-					if(Recovery.useRecaptcha3)
-						setCaptchaToken();
-
-					for(var i = 0; i<fields.length;i++)
-                    {
-						if(data["messages"]["error"] != "")
-                        {
-							$(".email-input, .captcha-input").parents(".input-group").addClass("border border-danger");
-							$(".email-input, .captcha-input").addClass("is-invalid");
-							$(".error-feedback").addClass("invalid-feedback d-block").removeClass("d-none").html(data["messages"]["error"]);
-						}
-					}
-
-					if(data["messages"]["error"]) {
-						if($(".email-input").val() != "") {
-							$(".error-feedback").addClass("invalid-feedback alert-danger d-block").removeClass("d-none").html(data["messages"]["error"]);
-						}
-					}
-					else if(data["messages"]["success"]) {
-						if($(".email-input").val() != "") {
-							$(".error-feedback").addClass("valid-feedback alert-success d-block").removeClass("d-none").html(data["messages"]["success"]);
-							$(".email-input").val('');
-						}
-					}
-					
-				} catch(e) {
-					console.error(e);
-				}				
-			});
-
-		}, 500);
-	},
-    
+var Recovery = {
+    loading: false,
+    useCaptcha: false,
+    useRecaptcha: false,
+    useRecaptcha3: false,
+    useFusionCaptcha: false,
+    request: function() {
+        var data = {email: $('.email-input').val(), captcha: $('.captcha-input').val()};
+        if (this.useRecaptcha) data.recaptcha = grecaptcha.getResponse();
+        if (this.useRecaptcha3) data.recaptcha = $('.g-recaptcha-response').val();
+        if (this.useFusionCaptcha) data['cap-token'] = $('input[name="cap-token"]').val();
+        this.send('create_request', data, '.email-input');
+    },
     reset: function() {
-		var postData = {
-			"token": $(".token-input").val(),
-			"new_password": $(".password-input").val()
-		};
-
-		clearTimeout (Recovery.timeout);
-		Recovery.timeout = setTimeout (function()
-		{
-			$.post(Config.URL + "password_recovery/reset_password", postData, function(data) {
-				try {
-					data = JSON.parse(data);
-
-					if(data["messages"]["error"]) {
-						if($(".password-input").val() != "") {
-							$(".error-feedback").addClass("invalid-feedback alert-danger d-block").removeClass("d-none").html(data["messages"]["error"]);
-						}
-					}
-					else if(data["messages"]["success"]) {
-						if($(".password-input").val() != "") {
-							$(".error-feedback").addClass("valid-feedback alert-success d-block").removeClass("invalid-feedback alert-danger d-none").html(data["messages"]["success"]);
-							$(".password-input, .token-input").val('');
-						}
-					}
-					
-				} catch(e) {
-					console.error(e);
-				}				
-			});
-
-		}, 500);
-	},
-
-	refreshCaptcha: function(ele) {
-		$(".captcha-input").val('');
-		$(".captcha-input").focus();
-		var captchaID = $(ele).data("captcha-id");
-		var imgField = $("img#"+ captchaID);
-		imgField.attr("src", imgField.attr("src") +"&d="+ new Date().getTime());
-	},
-
-	resetFusionCaptcha: function () {
-		$('input[name="cap-token"]').val('');
-
-		const widget = document.querySelector('cap-widget');
-		if (widget && typeof widget.reset === 'function') {
-			widget.reset();
-			widget.removeAttribute('disabled');
-		} else {
-			console.warn('Fusion captcha widget not found. Please ensure it is in the DOM.');
-		}
-	}
-}
+        this.send('reset_password', {token: $('.token-input').val(), new_password: $('.password-input').val()}, '.password-input, .token-input');
+    },
+    send: function(action, data, clearFields) {
+        if (this.loading) return;
+        this.loading = true;
+        data.csrf_token_name = Config.CSRF;
+        var form = $('.recovery-form'), feedback = form.find('.error-feedback'), original = {};
+        form.find(clearFields).each(function() { original[this.id] = this.value; });
+        form.attr('aria-busy', 'true').find(':submit').prop('disabled', true);
+        feedback.addClass('d-none').removeClass('d-block alert-success alert-danger valid-feedback invalid-feedback').empty();
+        function message(text, success) {
+            feedback.text(text).removeClass('d-none').addClass('d-block ' + (success ? 'alert-success valid-feedback' : 'alert-danger invalid-feedback')).trigger('focus');
+        }
+        $.ajax({url: Config.URL + 'password_recovery/' + action, method: 'POST', data: data, dataType: 'json'}).done(function(result) {
+            if (result.showCaptcha === true) $('.captcha-field').removeClass('d-none');
+            if (Recovery.useFusionCaptcha && result.captcha_error === true) Recovery.resetFusionCaptcha();
+            if (Recovery.useRecaptcha3) setCaptchaToken();
+            if (!result.messages) { message(lang('request_failed', 'auth'), false); return; }
+            if (result.messages.error) message(result.messages.error, false);
+            else if (result.messages.success) {
+                message(result.messages.success, true);
+                form.find(clearFields).each(function() { if (this.value === original[this.id]) this.value = ''; });
+            } else message(lang('request_failed', 'auth'), false);
+        }).fail(function(xhr) {
+            var result = xhr.responseJSON;
+            message(result && result.messages && result.messages.error ? result.messages.error : lang('request_failed', 'auth'), false);
+        }).always(function() {
+            Recovery.loading = false;
+            form.attr('aria-busy', 'false').find(':submit').prop('disabled', false);
+        });
+    },
+    showPassword: function(button) {
+        var shown = $(button).attr('aria-pressed') !== 'true';
+        $('#reset-password').attr('type', shown ? 'text' : 'password');
+        $(button).attr('aria-pressed', String(shown)).find('i').toggleClass('fa-eye', shown).toggleClass('fa-eye-slash', !shown);
+    },
+    refreshCaptcha: function(button) {
+        $('.captcha-input').val('').trigger('focus');
+        var image = $('#' + $(button).data('captcha-id'));
+        image.attr('src', image.attr('src') + '&d=' + Date.now());
+    },
+    resetFusionCaptcha: function() {
+        $('input[name="cap-token"]').val('');
+        var widget = document.querySelector('cap-widget');
+        if (widget && typeof widget.reset === 'function') { widget.reset(); widget.removeAttribute('disabled'); }
+    }
+};

@@ -49,7 +49,8 @@ class Accounts extends MX_Controller
 
         $search_value = $this->input->post('search');
 
-        $filtered_users = $this->accounts_model->count_filtered_users($search_value);
+        $search_value = is_string($search_value) ? mb_substr(trim($search_value), 0, 255) : '';
+        $filtered_users = $search_value === '' ? $total_users : $this->accounts_model->count_filtered_users($search_value);
 
         $start = $this->input->post('start');
 

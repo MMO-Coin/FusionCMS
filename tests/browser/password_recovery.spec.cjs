@@ -1,4 +1,4 @@
-const {test, expect, openPage, login, fixture, blockExternal, snapshot} = require('./helpers.cjs');
+const {test, expect, openPage, login, fixture, blockExternal, snapshot, verify} = require('./helpers.cjs');
 const {requestLink, reset} = require('./recovery-helpers.cjs');
 async function rejectPassword(page, password) {
     await openPage(page, '/login');
@@ -15,7 +15,11 @@ test('emailed reset links work once, preserve tokens after validation errors and
     page.on('console', message => messages.push(message.text()));
     const link = await requestLink(page, baseURL);
     await openPage(page, link.href);
-    expect((await reset(page, 'short')).error).toBeTruthy();
+    await page.locator('.password-input').fill('short');
+    await page.getByRole('button', {name: 'Reset your password', exact: true}).click();
+    expect(await page.locator('.password-input').evaluate(input => input.validity.tooShort)).toBe(true);
+    const invalid = await verify(page, '/password_recovery/reset_password', {token: link.searchParams.get('token'), new_password: 'short'});
+    expect((await invalid.json()).messages.error).toBeTruthy();
     expect((await reset(page, 'ChangedTest123')).success).toBeTruthy();
     await expect(page.locator('.error-feedback')).toContainText('The password has been successfully reset');
     await openPage(page, link.href);

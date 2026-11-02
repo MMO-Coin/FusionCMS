@@ -29,31 +29,7 @@ class Comments extends MX_Controller
     public function get($id)
     {
         requirePermission("canViewComments");
-
-        $cache = $this->cache->get("comments_" . $id . "_" . getLang());
-
-        if ($cache !== false) {
-            $comments = $cache;
-        } else {
-            $comments = $this->comments_model->getComments($id);
-
-            if (is_array($comments)) {
-                // Loop through and format the comments
-                foreach ($comments as $key => $comment) {
-                    $comments[$key]['profile'] = $this->template->page_url . "profile/" . $comment['author_id'];
-                    $comments[$key]['avatar'] = $this->user->getAvatar($comment['author_id'], "small");
-                    $comments[$key]['author'] = $this->user->getNickname($comment['author_id']);
-                }
-            }
-
-            $this->cache->save("comments_" . $id . "_" . getLang(), $comments);
-        }
-
-        $comments_html = '';
-
-        if (is_array($comments)) {
-            $comments_html = $this->template->loadPage("comments.tpl", array('url' => $this->template->page_url, 'comments' => $comments, 'user_is_gm' => hasPermission('canRemoveComment')));
-        }
+        $comments_html = $this->renderPage($id, 0);
 
         $values = array(
                     "form" => ($this->user->isOnline()) ? "onSubmit='Ajax.submitComment(" . $id . ");return false'" : "onSubmit='UI.alert(\"Please log in to comment!\");return false'",
@@ -67,6 +43,34 @@ class Comments extends MX_Controller
         $output = $this->template->loadPage("article_comments.tpl", $values);
 
         die($output);
+    }
+
+    public function page($id)
+    {
+        requirePermission('canViewComments');
+        die($this->renderPage($id, $this->input->get('before')));
+    }
+
+    private function renderPage($id, $before): string
+    {
+        $id = filter_var($id, FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]);
+        $before = filter_var($before, FILTER_VALIDATE_INT, ['options' => ['min_range' => 0]]);
+        if ($id === false || $before === false || !$this->news_model->articleExists($id, true)) {
+            http_response_code(400);
+            return '';
+        }
+        $key = 'comments_' . $id . '_v2_' . $before . '_' . getLang();
+        $data = $this->cache->get($key);
+        if ($data === false) {
+            $data = $this->comments_model->getCommentPage($id, $before);
+            $this->cache->save($key, $data, 60);
+        }
+        $data += [
+            'id' => $id, 'url' => $this->template->page_url,
+            'user_is_gm' => hasPermission('canRemoveComment'),
+        ];
+        $data['comments_html'] = $this->template->loadPage('comments.tpl', $data);
+        return $this->template->loadPage('comment_page.tpl', $data);
     }
 
     /**
@@ -86,7 +90,7 @@ class Comments extends MX_Controller
         if ($this->news_model->articleExists($id, true) && $this->user->isOnline()) {
             $message = $this->input->post('content');
 
-            if (strlen($message) > 0 && $message && strlen($message) <= 255) {
+            if (is_string($message) && mb_strlen(trim($message)) > 0 && mb_strlen($message) <= 255) {
                 // Format the comment
                 $comment = array(
                     "timestamp" => time(),
@@ -110,7 +114,7 @@ class Comments extends MX_Controller
                 $comment_arr['profile'] = $this->template->page_url . "profile/" . $comment_arr['author_id'];
                 $comment_arr['avatar'] = $this->user->getAvatar($comment_arr['author_id'], "small");
                 $comment_arr['author'] = $this->user->getNickname($comment_arr['author_id']);
-                $comment_arr['content'] = $this->template->format($message, true, true, 45);
+                $comment_arr['content'] = $this->template->format($message);
                 $comment_arr['url'] = $this->template->page_url;
                 $comment_arr['is_gm'] = $comment['is_gm'];
 
@@ -128,6 +132,8 @@ class Comments extends MX_Controller
                 die($this->template->loadPage("comments.tpl", $data));
             }
         }
+        http_response_code(422);
+        echo lang('comment_submit_error', 'news');
     }
 
     /**

@@ -1,0 +1,68 @@
+const {test, expect, openPage} = require('./helpers.cjs');
+const {requestLink, reset} = require('./recovery-helpers.cjs');
+
+test('registration accepts email aliases and long domains and shows linked text errors', async ({page}) => {
+    await openPage(page, '/register');
+    const email = page.getByLabel('Email', {exact: true});
+    await expect(email).toHaveAttribute('autocomplete', 'email');
+    for (const address of ['player+wow@example.com', 'player@example.technology']) {
+        await email.fill(address);
+        const checked = page.waitForResponse(response => response.url().endsWith('/register/check/email'));
+        await email.press('Tab'); await checked;
+        await expect(page.locator('#email_error')).toHaveText('Available');
+        await expect(email).toHaveAttribute('aria-invalid', 'false');
+    }
+    await page.getByLabel('Username', {exact: true}).fill('E2EPLAYER');
+    await page.getByLabel('Password', {exact: true}).fill('BrowserTest123');
+    await page.getByLabel('Confirm password', {exact: true}).fill('Different123');
+    await page.getByLabel('Confirm password', {exact: true}).press('Tab');
+    await expect(page.locator('#password_confirm_error')).toContainText("Passwords don't match");
+    await expect(page.getByLabel('Confirm password', {exact: true})).toHaveAttribute('aria-invalid', 'true');
+    await page.getByLabel('Confirm password', {exact: true}).fill('BrowserTest123');
+    await page.getByRole('button', {name: 'Create account!', exact: true}).click();
+    await expect(page.locator('#username_error')).toHaveText('Username is not available');
+    await expect(page.getByLabel('Username', {exact: true})).toBeFocused();
+    await expect(page.locator('#username_error img')).toHaveCount(0);
+    const usernameBox = await page.getByLabel('Username', {exact: true}).boundingBox();
+    const errorBox = await page.locator('#username_error').boundingBox();
+    expect(errorBox.y).toBeGreaterThanOrEqual(usernameBox.y + usernameBox.height - 1);
+    await page.screenshot({path: test.info().outputPath('registration-feedback.png')});
+    await page.getByLabel('Username', {exact: true}).fill('P1NEWPLAYER');
+    await page.getByLabel('Password', {exact: true}).fill('BrowserTest123');
+    await page.getByLabel('Confirm password', {exact: true}).fill('BrowserTest123');
+    await page.getByRole('button', {name: 'Create account!', exact: true}).click();
+    await expect(page.getByTitle('Your account has been created!', {exact: true})).toBeVisible();
+});
+
+test('recovery has linked fields, keyboard controls and a retry after a network failure', async ({page, baseURL}) => {
+    await openPage(page, '/password_recovery');
+    const email = page.getByLabel('E-Mail', {exact: true});
+    await expect(email).toHaveAttribute('autocomplete', 'email');
+    await expect(email).toHaveAttribute('aria-describedby', 'recovery-feedback');
+    await email.fill('e2eplayer@example.invalid');
+    await page.route('**/password_recovery/create_request', route => route.fulfill({status: 503, body: 'Unavailable'}));
+    await page.getByRole('button', {name: 'Recover password', exact: true}).click();
+    await expect(page.locator('#recovery-feedback')).toContainText('Please try again');
+    await expect(email).toHaveValue('e2eplayer@example.invalid');
+    await expect(page.getByRole('button', {name: 'Recover password', exact: true})).toBeEnabled();
+    await page.screenshot({path: test.info().outputPath('recovery-network-error.png')});
+    await page.unroute('**/password_recovery/create_request');
+    const link = await requestLink(page, baseURL);
+    await page.goto(link.href);
+    const password = page.getByLabel('New password', {exact: true});
+    await expect(password).toHaveAttribute('autocomplete', 'new-password');
+    const toggle = page.getByRole('button', {name: 'Show password', exact: true});
+    await toggle.focus(); await toggle.press('Space');
+    await expect(password).toHaveAttribute('type', 'text');
+    await expect(toggle).toHaveAttribute('aria-pressed', 'true');
+    await toggle.press('Enter');
+    await expect(password).toHaveAttribute('type', 'password');
+    const box = await toggle.boundingBox();
+    expect(box.width).toBeGreaterThanOrEqual(44); expect(box.height).toBeGreaterThanOrEqual(44);
+    const inputBox = await password.boundingBox();
+    expect(Math.abs(box.y - inputBox.y)).toBeLessThanOrEqual(1);
+    expect(box.x).toBeGreaterThanOrEqual(inputBox.x + inputBox.width - 1);
+    await expect(toggle).toHaveCSS('opacity', '1');
+    await page.screenshot({path: test.info().outputPath('recovery-accessibility.png')});
+    expect((await reset(page, 'UpdatedPass123')).success).toBeTruthy();
+});

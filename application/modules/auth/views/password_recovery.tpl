@@ -2,25 +2,25 @@
 	<div class="page_form">
 		<h4 class="font-weight-semibold text-uppercase mb-0">{lang('lost_password', 'recovery')}</h4>
 		<p class="text-2 opacity-7">{lang('enter_your_email', 'recovery')}</p>
-		<form onSubmit="Recovery.request(); return false">
-			<div class="alert text-center error-feedback d-none" role="alert"></div>
+		<form class="recovery-form" onSubmit="Recovery.request(); return false">
+			<div id="recovery-feedback" class="alert text-center error-feedback d-none" role="alert" tabindex="-1"></div>
 
-			<label>{lang('email', 'recovery')}</label>
-			<input type="email" class="email-input mb-3" required>
+			<label for="recovery-email">{lang('email', 'recovery')}</label>
+			<input id="recovery-email" name="email" type="email" autocomplete="email" aria-describedby="recovery-feedback" class="email-input mb-3" required>
 
             <div class="captcha-field {if !$use_captcha}d-none{/if}">
                 <div class="input-group mt-3 mb-3">
                     {if $captcha_type == 'image_captcha'}
-                        <label for="floatingCaptcha" class="input-group-text w-100 rounded-0 rounded-top text-center d-block" id="captcha">
+                        <label for="floatingCaptcha" class="input-group-text w-100 rounded-0 rounded-top text-center d-block" id="recovery-captcha-label">
                             <img src="{$url}auth/getCaptcha?{time()}" alt="captcha" width="150" height="30" id="captchaImage">
                         </label>
 
-                        <span class="input-group-text cursor-pointer ms-0 rounded-0 rounded-bottom-start" id="captcha" style="width:40px;" data-captcha-id="captchaImage" onClick="Recovery.refreshCaptcha(this);">
-                            <i class="fa-duotone fa-rotate"></i>
-                        </span>
+                        <button type="button" class="input-group-text ms-0 rounded-0 rounded-bottom-start" aria-label="{lang('login_refresh_captcha', 'auth')|escape}" style="min-width:44px;min-height:44px;" data-captcha-id="captchaImage" onClick="Recovery.refreshCaptcha(this);">
+                            <i class="fa-duotone fa-rotate" aria-hidden="true"></i>
+                        </button>
 
                         <div class="form-floating ms-0 flex-grow-1">
-                            <input type="text" class="form-control captcha-input border-0 rounded-0 rounded-bottom-end" id="floatingCaptcha" placeholder="{lang('login_label_captcha', 'auth')}" aria-describedby="captcha">
+                            <input type="text" class="form-control captcha-input border-0 rounded-0 rounded-bottom-end" id="floatingCaptcha" placeholder="{lang('login_label_captcha', 'auth')}" aria-describedby="recovery-feedback">
                             <label for="floatingCaptcha">{lang("login_label_captcha", "auth")}</label>
                         </div>
                     {elseif $captcha_type == 'recaptcha' || $captcha_type == 'recaptcha3'}

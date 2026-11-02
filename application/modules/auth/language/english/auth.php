@@ -19,3 +19,4 @@ $lang["minutes"] = "minutes.";
 $lang["captcha_invalid"] = "Captcha is invalid";
 $lang['login_show_password'] = 'Show password';
 $lang['login_refresh_captcha'] = 'Refresh captcha';
+$lang['request_failed'] = 'Unable to send the request. Please try again.';

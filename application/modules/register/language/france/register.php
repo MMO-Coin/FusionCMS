@@ -38,4 +38,7 @@
  $lang['confirm'] = "Confirmer le mot de passe";
  $lang['expansion'] = "Extension";
  $lang['submit'] = "Créer le compte !";
- 
+$lang['validation_valid'] = 'Disponible';
+$lang['validation_checking'] = 'Vérification...';
+$lang['validation_unavailable'] = 'Vérification impossible. Réessayez ou envoyez le formulaire.';
+$lang['password_limit'] = 'Utilisez de 6 à 16 caractères.';

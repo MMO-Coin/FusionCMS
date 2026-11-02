@@ -1,5 +1,7 @@
 <?php
 
+require_once dirname(__DIR__, 3) . '/libraries/PageBounds.php';
+
 class inbox_model extends CI_Model
 {
     private bool|int $inbox = false;
@@ -7,10 +9,13 @@ class inbox_model extends CI_Model
 
     public function getMessages($userId, $start = 0, $limit = 1): bool|array
     {
+        $bounds = PageBounds::bounds($start, $limit);
+        if (!$bounds) return false;
         $query = $this->db->table('private_message')
             ->where(['user_id' => $userId, 'deleted_user' => 0])
             ->orderBy('time', 'DESC')
-            ->limit($limit, $start)
+            ->orderBy('id', 'DESC')
+            ->limit($bounds[1], $bounds[0])
             ->get();
 
         if($query->getNumRows() > 0)
@@ -53,10 +58,13 @@ class inbox_model extends CI_Model
 
     public function getSent($userId, $start = 0, $limit = 1): bool|array
     {
+        $bounds = PageBounds::bounds($start, $limit);
+        if (!$bounds) return false;
         $query = $this->db->table('private_message')
             ->where(['sender_id' => $userId, 'deleted_sender' => 0])
             ->orderBy('time', 'DESC')
-            ->limit($limit, $start)
+            ->orderBy('id', 'DESC')
+            ->limit($bounds[1], $bounds[0])
             ->get();
 
         if($query->getNumRows() > 0)

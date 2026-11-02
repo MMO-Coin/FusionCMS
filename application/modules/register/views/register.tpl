@@ -1,33 +1,33 @@
-<div class="page-subbody mt-0">
+<div class="page-subbody mt-0 registration-form">
     <div class="col-12 col-xxl-6 col-xl-6 col-lg-6 col-md-12 col-sm-12 mx-auto">
         <div class="card-body p-5">
             {form_open('register')}
                 <div class="mb-3">
                     <label for="register_username">{lang("username", "register")}</label>
-                    <input class="form-control" type="text" name="register_username" id="register_username" autocomplete="username" value="{set_value('register_username')}" onChange="Validate.checkUsername()"/>
-                    <span id="username_error">{$username_error}</span>
+                    <input class="form-control" type="text" name="register_username" id="register_username" value="{set_value('register_username')}" onChange="Validate.checkUsername()" autocomplete="username" autocapitalize="none" spellcheck="false" minlength="4" maxlength="24" required aria-describedby="username_error" aria-invalid="{if $username_error}true{else}false{/if}"/>
+                    <span id="username_error" class="field-message" role="status" aria-live="polite">{$username_error|escape}</span>
                 </div>
                 <div class="mb-3">
                     <label for="register_email">{lang("email", "register")}</label>
-                    <input class="form-control" type="email" name="register_email" id="register_email" value="{set_value('register_email')}" onChange="Validate.checkEmail()"/>
-                    <span id="email_error">{$email_error}</span>
+                    <input class="form-control" type="email" name="register_email" id="register_email" value="{set_value('register_email')}" onChange="Validate.checkEmail()" autocomplete="email" required aria-describedby="email_error" aria-invalid="{if $email_error}true{else}false{/if}"/>
+                    <span id="email_error" class="field-message" role="status" aria-live="polite">{$email_error|escape}</span>
                 </div>
                 <div class="mb-3">
                     <label for="register_password">{lang("password", "register")}</label>
-                    <input class="form-control" type="password" name="register_password" id="register_password" autocomplete="new-password" value="{set_value('register_password')}" onChange="Validate.checkPassword()"/>
-                    <span id="password_error">{$password_error}</span>
+                    <input class="form-control" type="password" name="register_password" id="register_password" value="{set_value('register_password')}" onChange="Validate.checkPassword()" autocomplete="new-password" minlength="6" maxlength="16" required aria-describedby="password_error" aria-invalid="{if $password_error}true{else}false{/if}"/>
+                    <span id="password_error" class="field-message" role="status" aria-live="polite">{$password_error|escape}</span>
                 </div>
                 <div class="mb-3">
                     <label for="register_password_confirm">{lang("confirm", "register")}</label>
-                    <input class="form-control" type="password" name="register_password_confirm" autocomplete="new-password" id="register_password_confirm" value="{set_value('register_password_confirm')}" onChange="Validate.checkPasswordConfirm()"/>
-                    <span id="password_confirm_error">{$password_confirm_error}</span>
+                    <input class="form-control" type="password" name="register_password_confirm" id="register_password_confirm" value="{set_value('register_password_confirm')}" onChange="Validate.checkPasswordConfirm()" autocomplete="new-password" minlength="6" maxlength="16" required aria-describedby="password_confirm_error" aria-invalid="{if $password_confirm_error}true{else}false{/if}"/>
+                    <span id="password_confirm_error" class="field-message" role="status" aria-live="polite">{$password_confirm_error|escape}</span>
                 </div>
                 <div class="mb-3">
                 {if $use_captcha}
                     {if $captcha_type == 'image_captcha'}
-                        <label for="captcha"><img src="{$url}register/getCaptcha?{time()}" /></label>
-                        <input class="form-control" type="text" name="register_captcha" id="register_captcha"/>
-                        <span id="captcha_error">{$captcha_error}</span>
+                        <label for="register_captcha"><img src="{$url}register/getCaptcha?{time()}" /></label>
+                        <input class="form-control" type="text" name="register_captcha" id="register_captcha" aria-describedby="captcha_error"/>
+                        <span id="captcha_error" role="alert">{$captcha_error|escape}</span>
                     {elseif $captcha_type == 'recaptcha' || $captcha_type == 'recaptcha3'}
                         <div class="captcha {if $captcha_error && $captcha_type == 'recaptcha'} alert-captcha {/if}">
                             {$recaptcha_html}

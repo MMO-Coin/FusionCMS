@@ -57,9 +57,11 @@ function assertOwner(mysqli $db, string $database, string $nonce): void {
 }
 function resetFixture(mysqli $db, array $config): void {
     $db->select_db($config['cms']);
-    foreach (['donate_mmo_transactions', 'monthly_income', 'failed_logins', 'remember_me_tokens', 'password_recovery_key', 'email_log', 'account_session_versions', 'account_totp_uses', 'account_sessions'] as $table) $db->query("DELETE FROM `$table`");
+    foreach (['donate_mmo_transactions', 'monthly_income', 'failed_logins', 'remember_me_tokens', 'password_recovery_key', 'email_log', 'account_session_versions', 'account_totp_uses', 'account_sessions', 'private_message', 'comments', 'article_tag', 'articles'] as $table) $db->query("DELETE FROM `$table`");
+    $db->query('DELETE FROM account_data WHERE id > 3');
     $db->query('UPDATE account_data SET dp = 0, vp = 0');
     $db->select_db($config['auth']);
+    $db->query('DELETE FROM account WHERE id > 3');
     $db->query("UPDATE account SET sha_pass_hash = UPPER(SHA1(CONCAT(username, ':BROWSERTEST123'))), totp_secret = NULL, token_key = NULL");
     foreach (glob($config['root'] . '/site/writable/cache/throttle/*.json') as $file) unlink($file);
     require_once $config['root'] . '/site/application/libraries/ConfigEditor.php';
@@ -68,6 +70,12 @@ function resetFixture(mysqli $db, array $config): void {
     $editor->set('TOTPMasterSecret', '');
     $editor->set('totp_secret', true);
     $editor->save();
+    $editor = new ConfigEditor($config['root'] . '/site/application/config/fusion.php');
+    $editor->set('cache', false); $editor->save();
+    foreach (['news', 'messages'] as $module) copy(dirname(__DIR__, 2) . "/application/modules/$module/config/$module.php", $config['root'] . "/site/application/modules/$module/config/$module.php");
+    foreach (['news_*.cache', 'comments_*.cache', 'messages/*'] as $pattern) {
+        foreach (glob($config['root'] . '/site/writable/cache/data/' . $pattern) as $file) if (is_file($file)) unlink($file);
+    }
     copy(dirname(__DIR__, 2) . '/application/config/Session.php', $config['root'] . '/site/application/config/Session.php');
 }
 if ($action === 'setup') {
@@ -92,7 +100,7 @@ if ($action === 'setup') {
     }
     $db->query('INSERT INTO donate_mmo_packages (price, points) VALUES (1.25, 25)');
     $db->select_db($config['auth']);
-    $db->query('CREATE TABLE account (id INT PRIMARY KEY, username VARCHAR(32) UNIQUE, sha_pass_hash VARCHAR(40), email VARCHAR(100), joindate DATETIME, last_ip VARCHAR(45), last_login DATETIME, expansion INT DEFAULT 0, totp_secret VARBINARY(128), token_key VARCHAR(128))');
+    $db->query('CREATE TABLE account (id INT AUTO_INCREMENT PRIMARY KEY, username VARCHAR(32) UNIQUE, sha_pass_hash VARCHAR(40), email VARCHAR(100), joindate DATETIME, last_ip VARCHAR(45), last_login DATETIME, expansion INT DEFAULT 0, totp_secret VARBINARY(128), token_key VARCHAR(128))');
     $db->query('CREATE TABLE account_access (AccountId INT, SecurityLevel INT, RealmID INT DEFAULT -1)');
     $db->query('CREATE TABLE account_banned (id INT, banreason VARCHAR(255), active INT, bandate INT, unbandate INT, bannedby VARCHAR(50))');
     $db->query('CREATE TABLE ip_banned (ip VARCHAR(45), banreason VARCHAR(255), bandate INT, unbandate INT, bannedby VARCHAR(50))');
@@ -224,6 +232,37 @@ if ($action === 'cleanup') {
     $db->select_db($config['cms']);
     $row['claims'] = $db->query('SELECT * FROM account_totp_uses ORDER BY account_id, secret_hash')->fetch_all(MYSQLI_ASSOC);
     echo json_encode($row, JSON_THROW_ON_ERROR);
+} elseif ($action === 'seed-public-lists') {
+    require_once $site . '/application/libraries/ConfigEditor.php';
+    $db->select_db($config['cms']);
+    $article = $db->prepare('INSERT INTO articles (id, headline, content, author_id, timestamp, comments, type, type_content) VALUES (?, ?, ?, 1, 1793500000, ?, 0, NULL)');
+    for ($id = 1; $id <= 67; $id++) {
+        $headline = 'Page article ' . $id; $content = 'Article body ' . $id; $count = $id === 67 ? 70 : 0;
+        $article->bind_param('issi', $id, $headline, $content, $count); $article->execute();
+    }
+    $message = $db->prepare('INSERT INTO private_message (id, user_id, sender_id, title, message, time) VALUES (?, ?, ?, ?, ?, 1793500000)');
+    for ($id = 1; $id <= 60; $id++) {
+        $recipient = $id <= 30 ? 1 : 2; $sender = $id <= 30 ? 2 : 1;
+        $title = 'Page message ' . $id; $body = 'Message body';
+        $message->bind_param('iiiss', $id, $recipient, $sender, $title, $body); $message->execute();
+    }
+    $comment = $db->prepare('INSERT INTO comments (id, article_id, author_id, timestamp, content, is_gm) VALUES (?, 67, ?, 1793500000, ?, 0)');
+    for ($id = 1; $id <= 70; $id++) {
+        $author = $id % 2 + 1; $body = 'Page comment ' . $id;
+        $comment->bind_param('iis', $id, $author, $body); $comment->execute();
+    }
+    foreach (['news' => 'news_limit', 'messages' => 'pm_per_page'] as $module => $key) {
+        $editor = new ConfigEditor($site . "/application/modules/$module/config/$module.php");
+        $editor->set($key, 10); $editor->save();
+    }
+    $editor = new ConfigEditor($site . '/application/config/fusion.php'); $editor->set('cache', true); $editor->save();
+    $db->select_db($config['auth']);
+    $account = $db->prepare('INSERT INTO account (id, username, email, joindate) VALUES (?, ?, ?, UTC_TIMESTAMP())');
+    for ($id = 100; $id < 225; $id++) {
+        $name = 'AUDIT' . $id; $email = strtolower($name) . '@example.invalid';
+        $account->bind_param('iss', $id, $name, $email); $account->execute();
+    }
+    echo 'Seeded public list fixtures with caching enabled.';
 } elseif ($action === 'seed-admin-logs') {
     $db->select_db($config['cms']);
     $db->query('DELETE FROM logs');

@@ -22,6 +22,7 @@ class News extends MX_Controller
         $this->load->model('news_model');
         $this->load->model('comments_model');
         $this->load->helper('htmlpurifier_helper');
+        foreach (['comments_loading', 'comment_load_error', 'comment_submit_error', 'comment_retry', 'comment_delete_error'] as $key) clientLang($key, 'news');
     }
 
     public function sortByDate($a, $b)
@@ -37,8 +38,6 @@ class News extends MX_Controller
         requirePermission("view");
 
         $this->getNews();
-
-        usort($this->news_articles, array($this, "sortByDate"));
 
         // Show the page
         $this->displayPage();
@@ -160,14 +159,10 @@ class News extends MX_Controller
         $config = $this->initPagination();
 
         // Decide our starting index of the news
-        $this->startIndex = $this->uri->segment($config['uri_segment']);
-
-        if (empty($this->startIndex)) {
-            $this->startIndex = 0;
-        }
+        $this->startIndex = PageBounds::clamp($this->uri->segment($config['uri_segment']), (int) $config['total_rows'], $config['per_page']);
 
         // Get the cache
-        $cache = $this->cache->get("news_data_" . $this->startIndex . "_" . getLang());
+        $cache = $this->cache->get("news_data_v2_" . $this->startIndex . "_" . getLang());
 
         // Check if cache is valid
         if ($cache !== false) {
@@ -179,7 +174,7 @@ class News extends MX_Controller
         $summary_character_limit = $this->config->item('summary_character_limit');
 
         // Get the articles with the lower and upper limit decided by our pagination.
-        $this->news_articles = $this->news_model->getArticles((int)$this->startIndex, ((int)$this->startIndex + $config['per_page']));
+        $this->news_articles = $this->news_model->getArticles($this->startIndex, $config['per_page']);
 
         // For each key we need to add the special values that we want to print
         foreach ($this->news_articles as $key => $article) {
@@ -197,7 +192,7 @@ class News extends MX_Controller
             $this->news_articles[$key]['readMore'] = strlen($this->news_articles[$key]['content']) > $summary_character_limit;
         }
 
-        $this->cache->save("news_data_" . $this->startIndex . "_" . getLang(), $this->news_articles);
+        $this->cache->save("news_data_v2_" . $this->startIndex . "_" . getLang(), $this->news_articles);
     }
 
     private function initPagination()
@@ -206,7 +201,7 @@ class News extends MX_Controller
         $config['uri_segment'] = '2';
         $config['base_url'] = base_url() . '/news';
         $config['total_rows'] = $this->news_model->countArticles();
-        $config['per_page'] = $this->config->item('news_limit');
+        $config['per_page'] = PageBounds::size($this->config->item('news_limit'));
 
         $config['full_tag_open'] = '<ul class="pagination float-end">';
         $config['full_tag_close'] = '</ul>';

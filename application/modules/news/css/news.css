@@ -1,0 +1,4 @@
+
+.comment-load-more, .comment-retry, .comment-delete { min-height: 44px; min-width: 44px; }
+.comment-error { font-weight: 600; }
+.comment p { overflow-wrap: anywhere; white-space: pre-wrap; }

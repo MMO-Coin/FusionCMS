@@ -9,6 +9,7 @@ class Check extends MX_Controller
         parent::__construct();
 
         $this->user->guestArea();
+        $this->load->library('form_validation');
     }
 
     public function username($value = false)
@@ -26,7 +27,8 @@ class Check extends MX_Controller
     {
         $value = $this->input->post("email");
 
-        if ($value != false) {
+        if (!is_string($value) || !$this->form_validation->valid_email($value)) die('invalid');
+        if ($value !== '') {
             if (!$this->external_account_model->emailExists($value)) {
                 die("1");
             } else {

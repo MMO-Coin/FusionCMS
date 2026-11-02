@@ -42,3 +42,7 @@
  $lang['confirm'] = "Confirmar senha";
  $lang['expansion'] = "Expansão";
  $lang['submit'] = "Criar conta!";
+$lang['validation_valid'] = 'Disponível';
+$lang['validation_checking'] = 'Verificando...';
+$lang['validation_unavailable'] = 'Não foi possível verificar. Tente novamente ou envie o formulário.';
+$lang['password_limit'] = 'Use de 6 a 16 caracteres.';

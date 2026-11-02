@@ -4,6 +4,10 @@ This guide covers the `9.5.2` release of [MMO-Coin/FusionCMS](https://github.com
 
 ## Before you upgrade
 
+The public list update fixes news, inbox and sent pagination, bounds account search pages, and loads comments in batches of 25. News follows newest article ID first; messages use time and ID ordering. Existing news and message page caches are bypassed automatically. This update does not need an additional database migration. Keep the log index migration below if you have not applied it yet.
+
+Clear compiled templates after updating registration and recovery forms. If you maintain a custom registration template, merge the linked field errors, input attributes and text feedback from the bundled template. The bundled Heaven registration override is included. Custom language packs also need the new comment, registration and recovery feedback keys from the English files.
+
 For the log pagination changes on `main`, apply `application/modules/install/SQL/updates/2026_11_02_02_log_query_indexes.sql` to the **website database**. It adds indexes for account log ordering, website log ordering and article comments. The script can be rerun and reuses equivalent custom indexes. It does not change existing rows or the game databases. Fresh installations include these indexes. On large tables, schedule index creation during a maintenance window because it can take time and may block writes depending on the database version.
 
 Email logs now show 25 records per page, newest ID first, with search handled by the server. Account and website log pages use timestamp and ID ordering, and requests cannot select more than 100 records at once. Clear compiled templates after deploying the login labels and keyboard password toggle.

@@ -38,3 +38,7 @@ $lang['password'] = "Password";
 $lang['confirm'] = "Confirm password";
 $lang['expansion'] = "Expansion";
 $lang['submit'] = "Create account!";
+$lang['validation_valid'] = 'Available';
+$lang['validation_checking'] = 'Checking...';
+$lang['validation_unavailable'] = 'Unable to check right now. Try again or submit the form.';
+$lang['password_limit'] = 'Use 6 to 16 characters.';

@@ -1,162 +1,46 @@
-/**
- * Validation object for the registration page
- * @package FusionCMS
- */
+/** Registration feedback uses text and keeps responses tied to the current value. */
 var Validate = {
-	/**
-	 * Mark the field as valid
-	 * @param String field
-	 */
-	valid: function(field)
-	{
-		var field = $(field.replace("register_", "") + "_error");
-		
-		field.html('<img src="' + Config.URL + 'application/images/icons/accept.png" />');
-	},
-
-	/**
-	 * Mark the field as invalid
-	 * @param String field
-	 * @param String error
-	 */
-	invalid: function(field, error)
-	{
-		var field = $(field.replace("register_", "") + "_error");
-
-		if(error.length > 0)
-		{
-			field.html('<img src="' + Config.URL + 'application/images/icons/exclamation.png" data-tip="' + error + '" />');
-			Tooltip.refresh();
-		}
-		else
-		{
-			field.html('<img src="' + Config.URL + 'application/images/icons/exclamation.png" />');
-		}
-	},
-
-	/**
-	 * Show loading image
-	 * @param String field
-	 */
-	ajax: function(field, error)
-	{
-		var field = $(field.replace("register_", "") + "_error");
-		
-		field.html('<div class="lds-ring"><div></div><div></div><div></div><div></div></div>');
-		
-	},
-
-	/**
-	 * Validate username
-	 */
-	checkUsername: function()
-	{
-		var field_name = "#register_username",
-			field = $(field_name),
-			value = field.val();
-
-		// Length check
-		if(value.length < 4 || value.length > 24)
-		{
-			this.invalid(field_name, lang("username_limit_length", "register"));
-		}
-
-		// Alpha-numeric check
-		else if(!/^[a-z0-9]+$/i.test(value))
-		{
-			this.invalid(field_name, lang("username_limit", "register"));
-		}
-
-		// Availability check
-		else
-		{
-			this.ajax(field_name);
-
-			// Perform an ajax call to check if username is available
-			$.get(Config.URL + "register/check/username/" + value, function(data)
-			{
-				if(data == "1")
-				{
-					Validate.valid(field_name);
-				}
-				else
-				{
-					Validate.invalid(field_name, lang("username_not_available", "register"));
-				}
-			});
-		}
-	},
-
-	/**
-	 * Validate email
-	 */
-	checkEmail: function()
-	{
-		var field_name = "#register_email",
-			field = $(field_name),
-			value = field.val();
-
-		// Email check
-		if(!/^[a-zA-Z0-9._-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,4}$/.test(value))
-		{
-			this.invalid(field_name, lang("email_invalid", "register"));
-		}
-
-		// Availability check
-		else
-		{
-			this.ajax(field_name);
-
-			// Perform an ajax call to check if username is available
-			$.post(Config.URL + "register/check/email", {email: value, csrf_token_name: Config.CSRF}, function(data)
-			{
-				if(data == "1")
-				{
-					Validate.valid(field_name);
-				}
-				else
-				{
-					Validate.invalid(field_name, lang("email_not_available", "register"));
-				}
-			});
-		}
-	},
-
-	/**
-	 * Validate password
-	 */
-	checkPassword: function()
-	{
-		var field_name = "#register_password",
-			field = $(field_name),
-			value = field.val();
-
-		if(value.length < 6)
-		{
-			this.invalid(field_name, lang("password_short", "register"));
-		}
-		else
-		{
-			this.valid(field_name);
-		}
-	},
-
-	/**
-	 * Validate password confirm
-	 */
-	checkPasswordConfirm: function()
-	{
-		var field_name = "#register_password_confirm",
-			field = $(field_name),
-			value = field.val();
-
-		if(value !== $("#register_password").val())
-		{
-			this.invalid(field_name, lang("password_match", "register"));
-		}
-		else
-		{
-			this.valid(field_name);
-		}
-	},
-}
+    requests: {},
+    message: function(field, text, invalid) {
+        $(field).attr('aria-invalid', String(invalid));
+        $(field.replace('register_', '') + '_error').text(text);
+    },
+    valid: function(field) { this.message(field, field === '#register_username' || field === '#register_email' ? lang('validation_valid', 'register') : '', false); },
+    invalid: function(field, error) { this.message(field, error, true); },
+    check: function(field, url, data, unavailable) {
+        var value = $(field).val(), key = field;
+        if (this.requests[key]) this.requests[key].abort();
+        this.message(field, lang('validation_checking', 'register'), false);
+        this.requests[key] = $.ajax({url: Config.URL + url, method: data ? 'POST' : 'GET', data: data}).done(function(result) {
+            if ($(field).val() !== value) return;
+            result = String(result).trim();
+            if (result === '1') Validate.valid(field);
+            else Validate.invalid(field, lang(result.trim() === 'invalid' ? 'email_invalid' : unavailable, 'register'));
+        }).fail(function(xhr, status) {
+            if (status !== 'abort' && $(field).val() === value) Validate.message(field, lang('validation_unavailable', 'register'), false);
+        });
+    },
+    checkUsername: function() {
+        var field = '#register_username', value = $(field).val();
+        if (value.length < 4 || value.length > 24) this.invalid(field, lang('username_limit_length', 'register'));
+        else if (!/^[a-z0-9]+$/i.test(value)) this.invalid(field, lang('username_limit', 'register'));
+        else this.check(field, 'register/check/username/' + encodeURIComponent(value), null, 'username_not_available');
+    },
+    checkEmail: function() {
+        var field = '#register_email';
+        if (!$(field).val() || !$(field)[0].checkValidity()) this.invalid(field, lang('email_invalid', 'register'));
+        else this.check(field, 'register/check/email', {email: $(field).val(), csrf_token_name: Config.CSRF}, 'email_not_available');
+    },
+    checkPassword: function() {
+        var field = '#register_password', value = $(field).val();
+        if (value.length < 6 || value.length > 16) this.invalid(field, lang('password_limit', 'register'));
+        else this.valid(field);
+        if ($('#register_password_confirm').val()) this.checkPasswordConfirm();
+    },
+    checkPasswordConfirm: function() {
+        var field = '#register_password_confirm';
+        if (!$(field).val() || $(field).val() !== $('#register_password').val()) this.invalid(field, lang('password_match', 'register'));
+        else this.valid(field);
+    }
+};
+$(function() { $('#register_username').closest('form').find('[aria-invalid="true"]').first().trigger('focus'); });

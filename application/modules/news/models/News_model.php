@@ -1,5 +1,7 @@
 <?php
 
+require_once dirname(__DIR__, 3) . '/libraries/PageBounds.php';
+
 class News_model extends CI_Model
 {
     /**
@@ -14,7 +16,9 @@ class News_model extends CI_Model
         $builder = $this->db->table('articles');
         $builder->select();
         if ($start !== true) {
-            $builder->limit($limit, $start);
+            $bounds = PageBounds::bounds($start, $limit);
+            if (!$bounds) return [];
+            $builder->limit($bounds[1], $bounds[0]);
         }
 
         $builder->orderBy('id', 'desc');
@@ -25,6 +29,7 @@ class News_model extends CI_Model
         if ($result) {
             return $this->template->format($result);
         } else {
+            if ($start !== 0) return [];
             // Instead of showing a blank space, we show a default article
             return [
                 [

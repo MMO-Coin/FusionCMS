@@ -8,6 +8,7 @@ use MX\MX_Controller;
  */
 class Messages extends MX_Controller
 {
+    private int $pageSize;
     /**
      * Load our resources
      */
@@ -30,7 +31,7 @@ class Messages extends MX_Controller
      * @param Int $startIndex Start row for inbox pagination
      * @param bool|Int $sentIndex Start row for sent pagination
      */
-    public function index(int $startIndex = 0, bool|int $sentIndex = false)
+    public function index($startIndex = 0, $sentIndex = false)
     {
         clientLang("deleting", "messages");
         clientLang("no_messages", "messages");
@@ -48,15 +49,19 @@ class Messages extends MX_Controller
             $is_sent = false;
         }
 
+        $this->pageSize = PageBounds::size($this->config->item('pm_per_page'));
+        $startIndex = PageBounds::clamp($startIndex, (int) $this->inbox_model->countMessages($this->user->getId()), $this->pageSize);
+        $sentIndex = PageBounds::clamp($sentIndex, (int) $this->inbox_model->countSent($this->user->getId()), $this->pageSize);
+
         // Is there cache available?
-        $cache = $this->cache->get("messages/" . $this->user->getId() . "_" . $startIndex . "_" . $sentIndex . "_" . getLang());
+        $cache = $this->cache->get("messages/" . $this->user->getId() . "_v2_" . $startIndex . "_" . $sentIndex . "_" . getLang());
 
         // Can we use it?
         if ($cache !== false) {
             $page = $cache;
         } else {
             // Get inbox messages
-            $messages = $this->inbox_model->getMessages($this->user->getId(), $startIndex, ($startIndex + $this->config->item('pm_per_page')));
+            $messages = $this->inbox_model->getMessages($this->user->getId(), $startIndex, $this->pageSize);
 
             // There are no messages
             if ($messages === false) {
@@ -69,7 +74,7 @@ class Messages extends MX_Controller
             }
 
             // Get sent messages
-            $sent = $this->inbox_model->getSent($this->user->getId(), $sentIndex, ($sentIndex + $this->config->item('pm_per_page')));
+            $sent = $this->inbox_model->getSent($this->user->getId(), $sentIndex, $this->pageSize);
 
             if ($sent === false) {
                 $sent = [];
@@ -103,7 +108,7 @@ class Messages extends MX_Controller
             $page = $this->template->loadPage("page.tpl", $page_data);
 
             // Cache it forever
-            $this->cache->save("messages/" . $this->user->getId() . "_" . $startIndex . "_" . $sentIndex . "_" . getLang(), $page);
+            $this->cache->save("messages/" . $this->user->getId() . "_v2_" . $startIndex . "_" . $sentIndex . "_" . getLang(), $page);
         }
 
         // Build template
@@ -139,36 +144,12 @@ class Messages extends MX_Controller
      */
     private function getPagination(string $type, int $inbox, int $sent)
     {
-        if ($type == "inbox") {
-            $count = $this->inbox_model->countMessages($this->user->getId());
-
-            if ($inbox + $this->config->item('pm_per_page') <= $count
-                && $inbox - $this->config->item('pm_per_page') >= 0) {
-                $link = '<a href="' . base_url() . 'messages/page/' . ($inbox - $this->config->item('pm_per_page')) . '">&larr; ' . lang("newer", "messages") . '</a>';
-                $link .= '<a href="' . base_url() . 'messages/page/' . ($inbox + $this->config->item('pm_per_page')) . '">' . lang("older", "messages") . ' &rarr;</a>';
-            } elseif ($inbox + $this->config->item('pm_per_page') <= $count) {
-                $link = '<a href="' . base_url() . 'messages/page/' . ($inbox + $this->config->item('pm_per_page')) . '">' . lang("older", "messages") . ' &rarr;</a>';
-            } elseif ($inbox + $this->config->item('pm_per_page') > $count && $inbox != 0) {
-                $link = '<a href="' . base_url() . 'messages/page/' . ($inbox - $this->config->item('pm_per_page')) . '">&larr; ' . lang("newer", "messages") . '</a>';
-            } else {
-                $link = '';
-            }
-        } else {
-            $count = $this->inbox_model->countSent($this->user->getId());
-
-            if ($sent + $this->config->item('pm_per_page') <= $count
-                && $sent - $this->config->item('pm_per_page') >= 0) {
-                $link = '<a href="' . base_url() . 'messages/page/' . $inbox . '/' . ($sent - $this->config->item('pm_per_page')) . '">&larr; ' . lang("newer", "messages") . '</a>';
-                $link .= '<a href="' . base_url() . 'messages/page/' . $inbox . '/' . ($sent + $this->config->item('pm_per_page')) . '">' . lang("older", "messages") . ' &rarr;</a>';
-            } elseif ($sent + $this->config->item('pm_per_page') <= $count) {
-                $link = '<a href="' . base_url() . 'messages/page/' . $inbox . '/' . ($sent + $this->config->item('pm_per_page')) . '">' . lang("older", "messages") . ' &rarr;</a>';
-            } elseif ($sent + $this->config->item('pm_per_page') > $count && $sent != 0) {
-                $link = '<a href="' . base_url() . 'messages/page/' . $inbox . '/' . ($sent - $this->config->item('pm_per_page')) . '">&larr; ' . lang("newer", "messages") . '</a>';
-            } else {
-                $link = '';
-            }
-        }
-
-        return '<div id="messages_pagination">' . $link . '</div>';
+        $offset = $type === 'inbox' ? $inbox : $sent;
+        $count = $type === 'inbox' ? $this->inbox_model->countMessages($this->user->getId()) : $this->inbox_model->countSent($this->user->getId());
+        $url = base_url() . 'messages/page/' . ($type === 'inbox' ? '' : $inbox . '/');
+        $links = [];
+        if ($offset > 0) $links[] = '<a href="' . $url . max(0, $offset - $this->pageSize) . '">&larr; ' . lang('newer', 'messages') . '</a>';
+        if ($offset + $this->pageSize < $count) $links[] = '<a href="' . $url . ($offset + $this->pageSize) . '">' . lang('older', 'messages') . ' &rarr;</a>';
+        return '<nav class="messages-pagination" aria-label="' . htmlspecialchars(lang($type === 'inbox' ? 'inbox' : 'sent_messages', 'messages'), ENT_QUOTES, 'UTF-8') . '">' . implode(' ', $links) . '</nav>';
     }
 }

@@ -1,5 +1,7 @@
 <?php
 
+require_once dirname(__DIR__, 3) . '/libraries/PageBounds.php';
+
 class Comments_model extends CI_Model
 {
     /**
@@ -8,28 +10,44 @@ class Comments_model extends CI_Model
      * @param  Int $id
      * @return Array
      */
-    public function getComments($id)
+    public function getComments($id, $before = 0, $limit = 25)
     {
-        $query = $this->db->table('comments')->select()->where('article_id', $id)->orderBy('id', 'desc')->get();
+        return $this->getCommentPage($id, $before, $limit)['comments'];
+    }
 
-        if ($query->getNumRows() > 0) {
-            $result = $query->getResultArray();
+    public function getCommentPage($id, $before = 0, $limit = 25): array
+    {
+        $bounds = PageBounds::bounds($before, $limit);
+        $id = filter_var($id, FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]);
+        if (!$bounds || $id === false) return ['comments' => [], 'next_cursor' => 0];
+        $builder = $this->db->table('comments')->where('article_id', $id)->where('content !=', '');
+        if ($bounds[0]) $builder->where('id <', $bounds[0]);
+        $rows = $builder->orderBy('id', 'DESC')->limit($bounds[1] + 1)->get()->getResultArray();
+        $more = count($rows) > $bounds[1];
+        $rows = array_slice($rows, 0, $bounds[1]);
+        $next = $more ? (int) end($rows)['id'] : 0;
 
-            foreach ($result as $key => $value) {
-                //Remove the empty comments since they are useless…
-                if ($value['content'] == "") {
-                    unset($result[$key]);
-                }
-                //Format the comments we have to enable xss protection :D
-                else {
-                    $result[$key]['content'] = $this->template->format($value['content']);
-                }
+        if ($rows) {
+            $ids = array_values(array_unique(array_column($rows, 'author_id')));
+            $profiles = $this->db->table('account_data a')->select('a.id, a.nickname, v.avatar')
+                ->join('avatars v', 'v.id = a.avatar', 'left')->whereIn('a.id', $ids)->get()->getResultArray();
+            $profiles = array_column($profiles, null, 'id');
+            $missing = array_values(array_filter($ids, static fn($id) => empty($profiles[$id]['nickname'])));
+            $names = [];
+            if ($missing) {
+                $accounts = $this->external_account_model->getConnection()->table(table('account'))
+                    ->select(columns('account', ['id', 'username']))->whereIn(column('account', 'id'), $missing)
+                    ->get()->getResultArray();
+                $names = array_column($accounts, 'username', 'id');
             }
-
-            return $result;
-        } else {
-            return [];
+            foreach ($rows as &$row) {
+                $profile = $profiles[$row['author_id']] ?? [];
+                $row['author'] = ($profile['nickname'] ?? '') ?: ($names[$row['author_id']] ?? lang('system', 'news'));
+                $row['avatar'] = base_url() . 'application/images/avatar/' . ($profile['avatar'] ?? '');
+                $row['content'] = $this->template->format($row['content']);
+            }
         }
+        return ['comments' => $rows, 'next_cursor' => $next];
     }
 
     /**

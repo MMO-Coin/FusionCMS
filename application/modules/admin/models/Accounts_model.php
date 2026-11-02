@@ -4,6 +4,7 @@ use CodeIgniter\Database\BaseConnection;
 use MX\CI;
 
 require_once dirname(__DIR__, 3) . '/libraries/LogPagination.php';
+require_once dirname(__DIR__, 3) . '/libraries/PageBounds.php';
 
 class Accounts_model extends CI_Model
 {
@@ -17,17 +18,10 @@ class Accounts_model extends CI_Model
 
     public function get_users($limit, $start, $search = null)
     {
-        $builder = $this->connection->table('account')->select('id, username, email, joindate, expansion');
-
-        if (!empty($search))
-        {
-            $builder->groupStart()
-                        ->like('username', $search)
-                        ->orLike('email', $search)
-                    ->groupEnd();
-        }
-
-        $builder->limit($limit, $start);
+        $bounds = PageBounds::bounds($start, $limit);
+        if (!$bounds) return [];
+        $builder = $this->accountSearch($search)->select('id, username, email, joindate, expansion');
+        $builder->orderBy('id', 'ASC')->limit($bounds[1], $bounds[0]);
         $query = $builder->get();
         return $query->getResultArray();
     }
@@ -39,18 +33,19 @@ class Accounts_model extends CI_Model
 
     public function count_filtered_users($search = null)
     {
-        $builder = $this->connection->table('account')->select();
+        return $this->accountSearch($search)->countAllResults();
+    }
 
-        if (!empty($search))
-        {
-            $builder->groupStart()
-                        ->like('username', $search)
-                        ->orLike('email', $search)
-                    ->groupEnd();
+    private function accountSearch($search)
+    {
+        $builder = $this->connection->table('account');
+        $search = is_string($search) ? mb_substr(trim($search), 0, 255) : '';
+        if ($search !== '') {
+            $escape = $this->connection->likeEscapeChar;
+            $term = strtr($search, [$escape => $escape . $escape, '%' => $escape . '%', '_' => $escape . '_']);
+            $builder->groupStart()->like('username', $term, 'both', true)->orLike('email', $term, 'both', true)->groupEnd();
         }
-
-        $query = $builder->get();
-        return $query->getNumRows();
+        return $builder;
     }
 
     public function getById($id)

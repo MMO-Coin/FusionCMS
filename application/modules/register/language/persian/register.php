@@ -38,3 +38,7 @@ $lang['password'] = "رمز عبور";
 $lang['confirm'] = "تایید رمز عبور";
 $lang['expansion'] = "پچ";
 $lang['submit'] = "ایجاد حساب کاربری!";
+$lang['validation_valid'] = 'در دسترس است';
+$lang['validation_checking'] = 'در حال بررسی...';
+$lang['validation_unavailable'] = 'بررسی ممکن نیست. دوباره تلاش کنید یا فرم را ارسال کنید.';
+$lang['password_limit'] = 'از ۶ تا ۱۶ نویسه استفاده کنید.';

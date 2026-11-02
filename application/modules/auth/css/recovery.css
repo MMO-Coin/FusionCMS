@@ -13,3 +13,8 @@
 .valid-feedback {
     color: #0f5132!important;
 }
+.recovery-form button:focus-visible { outline: 3px solid currentColor; outline-offset: 3px; }
+.recovery-form button.input-group-text { opacity: 1; }
+.recovery-form label, .recovery-form input, .recovery-form button.input-group-text, .recovery-form .error-feedback { color: var(--auth-control-color, #f8f9fa) !important; }
+.recovery-form .password-field { display: flex; flex-wrap: nowrap; align-items: stretch; }
+.recovery-form .password-field .password-input { flex: 1 1 auto; width: 1%; min-width: 0; }

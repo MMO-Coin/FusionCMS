@@ -44,6 +44,7 @@ class Register extends MX_Controller
         clientLang("email_invalid", "register");
         clientLang("password_short", "register");
         clientLang("password_match", "register");
+        foreach (['validation_valid', 'validation_checking', 'validation_unavailable', 'password_limit'] as $key) clientLang($key, 'register');
 
         $this->template->setTitle(lang("register", "register"));
 
@@ -53,7 +54,7 @@ class Register extends MX_Controller
         $this->form_validation->set_rules('register_password', 'password', 'trim|required|min_length[6]|max_length[16]');
         $this->form_validation->set_rules('register_password_confirm', 'password confirmation', 'trim|required|matches[register_password]');
 
-        $this->form_validation->set_error_delimiters('<img src="' . $this->template->page_url . 'application/images/icons/exclamation.png" data-tip="', '" />');
+        $this->form_validation->set_error_delimiters('', '');
 
         require_once('application/libraries/Captcha.php');
 
@@ -118,7 +119,7 @@ class Register extends MX_Controller
                 // Loop through fields and assign error or success image
                 foreach ($fields as $field) {
                     if (strlen(form_error('register_' . $field)) == 0 && empty($data[$field . "_error"])) {
-                        $data[$field . "_error"] = '<img src="' . $this->template->page_url . 'application/images/icons/accept.png" />';
+                        $data[$field . "_error"] = "";
                     } elseif (empty($data[$field . "_error"])) {
                         $data[$field . "_error"] = form_error('register_' . $field);
                     }
@@ -130,7 +131,7 @@ class Register extends MX_Controller
                     }
                 } else if ($captcha_type == 'image_captcha') {
                     if ($this->input->post('register_captcha') != $captchaObj->getValue()) {
-                        $data['captcha_error'] = '<img src="' . $this->template->page_url . 'application/images/icons/exclamation.png" />';
+                        $data['captcha_error'] = lang('captcha_invalid', 'auth');
                     }
                 } else if ($captcha_type == 'fusion_captcha') {
                     if(!$captcha) {
@@ -144,7 +145,7 @@ class Register extends MX_Controller
                 "module" => "default",
                 "headline" => lang("account_creation", "register"),
                 "content" => $this->template->loadPage("register.tpl", $data),
-            ]), false, "modules/register/js/validate.js");
+            ]), "modules/register/css/register.css", "modules/register/js/validate.js");
         } else {
             $username = $this->input->post('register_username');
             $password = $this->input->post('register_password');
@@ -196,7 +197,7 @@ class Register extends MX_Controller
             return true;
         } else {
             // Email exists
-            $this->emailError = '<img src="' . $this->template->page_url . 'application/images/icons/exclamation.png" data-tip="This email is not available" />';
+            $this->emailError = lang('email_not_available', 'register');
 
             return false;
         }
@@ -211,7 +212,7 @@ class Register extends MX_Controller
             return true;
         } else {
             // User exists
-            $this->usernameError = '<img src="' . $this->template->page_url . 'application/images/icons/exclamation.png" data-tip="This username is not available" />';
+            $this->usernameError = lang('username_not_available', 'register');
 
             return false;
         }
