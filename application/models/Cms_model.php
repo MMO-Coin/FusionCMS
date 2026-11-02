@@ -353,7 +353,7 @@ class Cms_model extends CI_Model
      * @param string|null $expectedSessionVersion Version captured when the account signed in.
      * @return string The raw token to set in the cookie (never stored as-is).
      */
-    public function issueRememberMeToken(int $accountId, ?string $expectedSessionVersion = null): string
+    public function issueRememberMeToken(int $accountId, ?string $expectedSessionVersion = null, string $ip = '', string $agent = ''): string
     {
         $lifetime = (int) $this->config->item('cookie_expire');
         if ($accountId <= 0 || $lifetime <= 0) {
@@ -369,6 +369,9 @@ class Cms_model extends CI_Model
             'token_hash'  => $tokenHash,
             'expires_at'  => date('Y-m-d H:i:s', time() + $lifetime),
             'created_at'  => date('Y-m-d H:i:s'),
+            'ip_address' => substr($ip, 0, 45),
+            'user_agent' => mb_substr(mb_convert_encoding($agent, 'UTF-8', 'UTF-8'), 0, 255),
+            'last_used_at' => null,
         ]);
         if (!$inserted) throw new RuntimeException('Unable to store the remembered login.');
         // Check after insertion so a reset that already deleted tokens cannot
@@ -390,7 +393,7 @@ class Cms_model extends CI_Model
      * @param string $rawToken
      * @return array|false Account ID, successor token and captured session version, or false.
      */
-    public function validateRememberMeToken(string $rawToken): array|false
+    public function validateRememberMeToken(string $rawToken, string $ip = '', string $agent = ''): array|false
     {
         if (!preg_match('/^[a-f0-9]{128}$/D', $rawToken)) return false;
         $tokenHash = hash('sha256', $rawToken);
@@ -409,7 +412,9 @@ class Cms_model extends CI_Model
         $updated = $this->db->table('remember_me_tokens')
             ->where('id', $row['id'])->where('token_hash', $tokenHash)
             ->where('expires_at >', date('Y-m-d H:i:s', $now))
-            ->update(['token_hash' => hash('sha256', $newRawToken), 'expires_at' => date('Y-m-d H:i:s', $now + $lifetime)]);
+            ->update(['token_hash' => hash('sha256', $newRawToken), 'expires_at' => date('Y-m-d H:i:s', $now + $lifetime),
+                'last_used_at' => date('Y-m-d H:i:s', $now), 'ip_address' => substr($ip, 0, 45),
+                'user_agent' => mb_substr(mb_convert_encoding($agent, 'UTF-8', 'UTF-8'), 0, 255)]);
         if (!$updated || $this->db->affectedRows() !== 1) return false;
         return [
             'account_id' => (int) $row['account_id'],

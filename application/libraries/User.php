@@ -107,11 +107,16 @@ class User
                 'language' => $this->CI->internal_user_model->getLanguage(),
             ];
 
-            // Regenerate session ID to prevent fixation
-            Services::session()->regenerate();
+            // Replace this browser's inventory entry and destroy its old session ID.
+            $previousDevice = Services::session()->get('account_device_token');
+            if (is_string($previousDevice)) {
+                $this->CI->load->model('account_device_model');
+                $this->CI->account_device_model->forget((int) Services::session()->get('uid'), $previousDevice);
+            }
+            Services::session()->regenerate(true);
 
             // Set the session with the above data
-            Services::session()->remove(['totp_secret', 'totp_enrollment']);
+            Services::session()->remove(['totp_secret', 'totp_enrollment', 'account_device_token']);
             Services::session()->set($userdata);
 
             // Reload this object.

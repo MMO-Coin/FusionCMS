@@ -869,9 +869,7 @@ class Template
             }
 
             if ($menu['permission'] == 'securityAccount') {
-                if ($this->config->item('totp_secret')) {
-                    $groupedMenus[$menu['group']][] = $menu;
-                }
+                $groupedMenus[$menu['group']][] = $menu;
                 continue;
             }
 

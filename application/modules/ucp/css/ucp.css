@@ -5,6 +5,11 @@
 	height:150px;
 }
 
+#account-security .security-devices { list-style: none; padding: 0; }
+#account-security .security-device { border: 1px solid rgba(128, 128, 128, .35); border-radius: .4rem; padding: 1rem; margin: .75rem 0; overflow-wrap: anywhere; }
+#account-security .security-current { display: inline-block; margin: .2rem .5rem; font-weight: bold; }
+#account-security .security-agent { overflow-wrap: anywhere; }
+
 .user-avatar img {
 	width:100%;
 	height:150px;

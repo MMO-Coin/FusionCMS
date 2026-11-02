@@ -5,6 +5,26 @@ const Security = {
         $('#security_help').toggle(value === 'true');
     },
 
+    async signOutEverywhere() {
+        const confirmation = await Swal.fire({
+            title: 'Sign out everywhere?',
+            text: 'This signs out this browser, every other session and all remembered devices for your account.',
+            icon: 'warning', showCancelButton: true, confirmButtonText: 'Sign out everywhere', cancelButtonText: 'Cancel',
+        });
+        if (!confirmation.isConfirmed || !Security.canSubmit) return;
+        Security.canSubmit = false;
+        const token = document.cookie.split('; ').find(value => value.startsWith('csrf_cookie_name='));
+        $.ajax({
+            url: Config.URL + 'ucp/security/signOutEverywhere', method: 'POST', dataType: 'json',
+            data: {csrf_token_name: token ? decodeURIComponent(token.substring('csrf_cookie_name='.length)) : Config.CSRF},
+        }).done(data => {
+            if (data.status) window.location.replace(Config.URL + 'login');
+            else Swal.fire({text: data.message, icon: 'error'});
+        }).fail(() => {
+            Swal.fire({text: 'Unable to sign out. Reload the page and try again.', icon: 'error'});
+        }).always(() => { Security.canSubmit = true; });
+    },
+
     submit() {
         if (!Security.canSubmit) return;
         Security.canSubmit = false;

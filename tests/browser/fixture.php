@@ -57,7 +57,7 @@ function assertOwner(mysqli $db, string $database, string $nonce): void {
 }
 function resetFixture(mysqli $db, array $config): void {
     $db->select_db($config['cms']);
-    foreach (['donate_mmo_transactions', 'monthly_income', 'failed_logins', 'remember_me_tokens', 'password_recovery_key', 'email_log', 'account_session_versions', 'account_totp_uses'] as $table) $db->query("DELETE FROM `$table`");
+    foreach (['donate_mmo_transactions', 'monthly_income', 'failed_logins', 'remember_me_tokens', 'password_recovery_key', 'email_log', 'account_session_versions', 'account_totp_uses', 'account_sessions'] as $table) $db->query("DELETE FROM `$table`");
     $db->query('UPDATE account_data SET dp = 0, vp = 0');
     $db->select_db($config['auth']);
     $db->query("UPDATE account SET sha_pass_hash = UPPER(SHA1(CONCAT(username, ':BROWSERTEST123'))), totp_secret = NULL, token_key = NULL");
@@ -66,7 +66,9 @@ function resetFixture(mysqli $db, array $config): void {
     $editor = new ConfigEditor($config['root'] . '/site/application/config/auth.php');
     $editor->set('totp_secret_name', 'totp_secret');
     $editor->set('TOTPMasterSecret', '');
+    $editor->set('totp_secret', true);
     $editor->save();
+    copy(dirname(__DIR__, 2) . '/application/config/Session.php', $config['root'] . '/site/application/config/Session.php');
 }
 if ($action === 'setup') {
     // CREATE without IF NOT EXISTS prevents the installer SQL from touching an existing database.
@@ -156,6 +158,28 @@ if ($action === 'cleanup') {
 } elseif ($action === 'remembered') {
     $db->select_db($config['cms']);
     echo json_encode($db->query('SELECT * FROM remember_me_tokens ORDER BY id')->fetch_all(MYSQLI_ASSOC), JSON_THROW_ON_ERROR);
+} elseif ($action === 'security-options') {
+    require_once $site . '/application/libraries/ConfigEditor.php';
+    $editor = new ConfigEditor($site . '/application/config/auth.php');
+    $editor->set('totp_secret', false); $editor->save();
+    $sessionConfig = file_get_contents($repo . '/application/config/Session.php');
+    $sessionConfig = str_replace('public string $driver = DatabaseHandler::class;', 'public string $driver = \\CodeIgniter\\Session\\Handlers\\FileHandler::class;', $sessionConfig);
+    $sessionConfig = str_replace("public string \$savePath = 'ci_sessions';", 'public string $savePath = ' . var_export($site . '/writable/session', true) . ';', $sessionConfig);
+    file_put_contents($site . '/application/config/Session.php', $sessionConfig);
+} elseif ($action === 'device-inventory') {
+    $db->select_db($config['cms']);
+    echo json_encode($db->query('SELECT * FROM account_sessions ORDER BY account_id, created_at')->fetch_all(MYSQLI_ASSOC), JSON_THROW_ON_ERROR);
+} elseif ($action === 'hostile-device-metadata') {
+    $db->select_db($config['cms']);
+    $agent = '<img src=x onerror="window.deviceXss=1">';
+    foreach (['account_sessions', 'remember_me_tokens'] as $table) {
+        $statement = $db->prepare("UPDATE `$table` SET user_agent = ? WHERE account_id = 1 AND user_agent = 'TestInjectionBrowser/1.0'");
+        $statement->bind_param('s', $agent); $statement->execute();
+        if ($statement->affected_rows !== 1) throw new RuntimeException('Expected one owned device metadata fixture.');
+    }
+} elseif ($action === 'expire-device-session') {
+    $db->select_db($config['cms']);
+    $db->query('UPDATE account_sessions SET expires_at = UTC_TIMESTAMP() WHERE account_id = 1');
 } elseif ($action === 'totp-mode' || $action === 'seed-totp') {
     $mode = $argv[3] ?? 'binary';
     if (!in_array($mode, ['binary', 'base32', 'encrypted'], true)) throw new RuntimeException('Invalid TOTP fixture mode.');

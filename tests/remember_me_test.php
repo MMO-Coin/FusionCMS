@@ -84,7 +84,7 @@ namespace {
         return $result;
     }
 
-    $columns = ' (account_id INT NOT NULL, token_hash VARCHAR(64) NOT NULL, expires_at DATETIME NOT NULL, created_at DATETIME NOT NULL)';
+    $columns = " (account_id INT NOT NULL, token_hash VARCHAR(64) NOT NULL, expires_at DATETIME NOT NULL, created_at DATETIME NOT NULL, ip_address VARCHAR(45) NOT NULL DEFAULT '', user_agent VARCHAR(255) NOT NULL DEFAULT '', last_used_at DATETIME NULL)";
     $db = new \CodeIgniter\Database\SQLite3\Connection(['database' => ':memory:', 'DBDebug' => true]);
     $db->query('CREATE TABLE remember_me_tokens' . str_replace(' (', ' (id INTEGER PRIMARY KEY AUTOINCREMENT, ', $columns));
     $db->query('CREATE TABLE account_session_versions (account_id INT PRIMARY KEY, version CHAR(64) NOT NULL)');

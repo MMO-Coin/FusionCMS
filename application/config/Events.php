@@ -112,7 +112,7 @@ Events::on('pre_controller', static function () {
         if($username !== null || $rawToken !== null)
         {
             $tokenResult = is_string($username) && $username !== '' && is_string($rawToken)
-                ? CI::$APP->cms_model->validateRememberMeToken($rawToken) : false;
+                ? CI::$APP->cms_model->validateRememberMeToken($rawToken, CI::$APP->input->ip_address(), (string) CI::$APP->input->user_agent()) : false;
             $restored = false;
             if($tokenResult)
             {
@@ -176,6 +176,22 @@ Events::on('pre_controller', static function () {
                 // Normal request: send the user to the 2FA verification page
                 redirect(CI::$APP->template->page_url . 'auth/security');
             }
+        }
+    }
+    if (CI::$APP->user->isOnline()) {
+        $secret = CI::$APP->external_account_model->getTotpSecret();
+        // Inventory includes only sessions that have completed required 2FA.
+        if ($secret === '' || CI::$APP->user->getTotpSecret() === $secret) {
+            CI::$APP->load->model('account_device_model');
+            $token = Services::session()->get('account_device_token');
+            if (!is_string($token) || !preg_match('/^[a-f0-9]{64}$/D', $token)) {
+                $token = bin2hex(random_bytes(32));
+                Services::session()->set('account_device_token', $token);
+            }
+            $lifetime = config(\App\Config\Session::class)->expiration ?: (int) ini_get('session.gc_maxlifetime');
+            CI::$APP->account_device_model->track(CI::$APP->user->getId(), $token,
+                Services::session()->get('auth_session_version') ?? '', CI::$APP->input->ip_address(),
+                (string) CI::$APP->input->user_agent(), max(1, $lifetime));
         }
     }
 });

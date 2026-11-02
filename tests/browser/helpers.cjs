@@ -22,9 +22,12 @@ function scenario(reference, mode) {
 }
 function snapshot() { return JSON.parse(fixture('snapshot')); }
 async function openPage(page, url) {
-    const needsConsent = !(await page.context().cookies()).some(cookie => cookie.name === 'acceptCookies');
     const response = await page.goto(url);
-    if (needsConsent) await page.getByRole('button', {name: 'Accept', exact: true}).click();
+    const consent = async () => (await page.context().cookies(page.url())).some(cookie => cookie.name === 'acceptCookies' && cookie.value === '2');
+    if (!await consent()) {
+        await page.getByRole('button', {name: 'Accept', exact: true}).click();
+        await expect.poll(consent).toBe(true);
+    }
     return response;
 }
 async function blockExternal(context, baseURL) {

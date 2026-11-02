@@ -32,6 +32,24 @@ CREATE TABLE `account_session_versions` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8 COLLATE=utf8_unicode_ci;
 
 -- ----------------------------
+-- Table structure for account_sessions
+-- ----------------------------
+DROP TABLE IF EXISTS `account_sessions`;
+CREATE TABLE `account_sessions` (
+  `session_hash` char(64) CHARACTER SET ascii COLLATE ascii_bin NOT NULL,
+  `account_id` int(11) NOT NULL,
+  `version` char(64) CHARACTER SET ascii COLLATE ascii_bin NOT NULL,
+  `created_at` datetime NOT NULL,
+  `last_seen_at` datetime NOT NULL,
+  `expires_at` datetime NOT NULL,
+  `ip_address` varchar(45) NOT NULL DEFAULT '',
+  `user_agent` varchar(255) NOT NULL DEFAULT '',
+  PRIMARY KEY (`session_hash`),
+  INDEX `idx_account_sessions` (`account_id`, `version`, `expires_at`),
+  INDEX `idx_session_expiry` (`expires_at`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ----------------------------
 -- Table structure for account_totp_uses
 -- ----------------------------
 DROP TABLE IF EXISTS `account_totp_uses`;
@@ -1082,6 +1100,9 @@ CREATE TABLE `remember_me_tokens` (
   `token_hash` varchar(64) NOT NULL COMMENT 'SHA-256 hash of the random token',
   `expires_at` datetime NOT NULL,
   `created_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `ip_address` varchar(45) NOT NULL DEFAULT '',
+  `user_agent` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT '',
+  `last_used_at` datetime NULL DEFAULT NULL,
   PRIMARY KEY (`id`),
   INDEX `idx_token_hash` (`token_hash`),
   INDEX `idx_account_id` (`account_id`)

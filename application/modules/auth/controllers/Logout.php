@@ -20,6 +20,8 @@ class Logout extends MX_Controller
     {
         // Revoke every remembered login, including a token rotated on this request.
         $this->cms_model->deleteRememberMeTokenByAccount($this->user->getId());
+        $this->load->model('account_device_model');
+        $this->account_device_model->forget($this->user->getId(), (string) Services::session()->get('account_device_token'));
 
         // Clear all remember-me cookies
         $this->input->set_cookie("fcms_username", false);

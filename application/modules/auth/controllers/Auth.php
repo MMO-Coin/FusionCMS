@@ -168,7 +168,8 @@ class Auth extends MX_Controller
                 {
                     if($this->input->post("remember") == "true")
                     {
-                        $rawToken = $this->cms_model->issueRememberMeToken($this->user->getId(), Services::session()->get('auth_session_version'));
+                        $rawToken = $this->cms_model->issueRememberMeToken($this->user->getId(), Services::session()->get('auth_session_version'),
+                            $this->input->ip_address(), (string) $this->input->user_agent());
 
                         $cookieExpiry = $this->config->item('cookie_expire'); // 30 days
                         $this->input->set_cookie("fcms_username", $username, $cookieExpiry);

@@ -8,11 +8,11 @@ class Security extends MX_Controller
     public function __construct()
     {
         parent::__construct();
-        if (!$this->config->item('totp_secret')) redirect('ucp');
         $this->user->userArea();
         requirePermission('canUpdateAccountSettings');
         $this->load->library('GoogleAuthenticator');
         $this->load->model('totp_model');
+        $this->load->model('account_device_model');
     }
 
     public function index()
@@ -21,7 +21,7 @@ class Security extends MX_Controller
         $enabled = $this->external_account_model->getTotpSecret() !== '';
         $secret = '';
         $qr = '';
-        if (!$enabled) {
+        if ($this->config->item('totp_secret') && !$enabled) {
             $secret = $this->googleauthenticator->createSecret();
             Services::session()->set('totp_enrollment', [
                 'account_id' => $this->user->getId(), 'secret' => $secret, 'expires' => time() + 600,
@@ -29,7 +29,14 @@ class Security extends MX_Controller
             ]);
             $qr = $this->googleauthenticator->getQRCode($this->config->item('title') . ' - ' . $this->user->getUsername(), $secret);
         }
-        $settings = ['security_enabled' => $enabled, 'secret_key' => $secret, 'qr_code' => $qr];
+        $rememberedToken = $this->input->cookie('fcms_token');
+        $settings = ['security_enabled' => $enabled, 'secret_key' => $secret, 'qr_code' => $qr,
+            'two_factor_available' => (bool) $this->config->item('totp_secret'),
+            'active_sessions' => $this->account_device_model->sessions($this->user->getId(),
+                Services::session()->get('auth_session_version') ?? '', (string) Services::session()->get('account_device_token')),
+            'remembered_devices' => $this->account_device_model->remembered($this->user->getId(), is_string($rememberedToken) ? $rememberedToken : ''),
+            'security_timezone' => date_default_timezone_get(),
+        ];
         $data = [
             'module' => 'default',
             'headline' => breadcrumb(['ucp' => lang('ucp'), 'ucp/security' => lang('account_security', 'ucp')]),
@@ -41,6 +48,7 @@ class Security extends MX_Controller
     public function submit()
     {
         if ($this->input->method() !== 'post') show_error('Invalid request', 405);
+        if (!$this->config->item('totp_secret')) $this->respond(false, 'Two-factor authentication is not available.', 403);
         if (!Services::throttler()->check('totp_verify_' . $this->user->getId(), 5, MINUTE)) {
             $this->respond(false, 'Too many attempts. Wait a minute before trying again.', 429);
         }
@@ -94,5 +102,15 @@ class Security extends MX_Controller
         http_response_code($status);
         header('Content-Type: application/json');
         die(json_encode(['status' => $success, 'message' => $message]));
+    }
+
+    public function signOutEverywhere()
+    {
+        if ($this->input->method() !== 'post') show_error('Invalid request', 405);
+        // Identity always comes from the authenticated session, never POST data.
+        $this->account_session_model->invalidate($this->user->getId());
+        foreach (['fcms_username', 'fcms_token', 'fcms_password'] as $cookie) $this->input->set_cookie($cookie, '');
+        Services::session()->destroy();
+        $this->respond(true, 'You have been signed out everywhere. Sign in again to continue.');
     }
 }
