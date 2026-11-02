@@ -33,6 +33,13 @@ use MX\CI;
 class Template
 {
     private $CI;
+    private array $requiredAssets = [];
+
+    public function requireAssets(array $groups): void
+    {
+        $this->requiredAssets = array_values(array_unique(array_merge($this->requiredAssets, $groups)));
+    }
+
     private string $title;
     private bool|string $custom_description;
     private bool|string $custom_keywords;
@@ -264,6 +271,21 @@ class Template
         $sideboxes_side = $sideboxes['side'] ?? [];
         $sideboxes_top = $sideboxes['top'] ?? [];
         $sideboxes_bottom = $sideboxes['bottom'] ?? [];
+        $slides = $this->getSlider();
+        if (in_array($this->theme, ['default', 'heaven'], true)) {
+            require_once __DIR__ . '/PublicAssets.php';
+            $rendered = $content;
+            $types = [];
+            foreach ($sideboxes as $position) foreach ($position as $box) { $rendered .= $box['data']; $types[] = $box['type'] ?? ''; }
+            $home = $this->router->fetch_module() === 'news' && $this->router->fetch_method() === 'index';
+            $slider = $this->isSliderShown() && !empty($slides) && (!$this->config->item('slider_home') || $home);
+            if ($this->theme === 'heaven') {
+                $wall = $this->theme_config['config']['wall'] ?? [];
+                $slider = $slider && !empty($wall['enabled']) && (($wall['visibility'] ?? '') === 'always' || $home);
+            }
+            $assets = PublicAssets::select((array) $this->smarty->getTemplateVars('assets'), $this->router->fetch_module(), $this->router->fetch_method(), $rendered, $slider, $this->theme, $types, $this->requiredAssets);
+            $this->smarty->assign('assets', $assets);
+        }
         $header = $this->getHeader($css, $js);
         $modals = $this->getModals();
 
@@ -282,7 +304,7 @@ class Template
             "full_theme_path" => $this->page_url . "application/" . $this->theme_path,
             "serverName" => $this->config->item('server_name'),
             "page" => '<div id="content_ajax">' . $content . '</div>',
-            "slider" => $this->getSlider(),
+            "slider" => $slides,
             "show_slider" => $this->isSliderShown(),
             "head" => $header,
             "modals" => $modals,
@@ -312,6 +334,7 @@ class Template
         $array = [
             "title" => $this->title . $this->config->item('title'),
             "content" => $content,
+            "public_assets" => true,
             "js" => $js,
             "css" => $css,
             "slider" => $this->isSliderShown(),

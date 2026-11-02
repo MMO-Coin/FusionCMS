@@ -92,6 +92,10 @@ Set `FUSION_E2E_OUTPUT_DIR` to an absolute path outside the checkout to keep rep
 
 ## Reports and failures
 
+`php tests/next_batch_test.php` checks bounded store/GM reads, explicit order completion, refund rollback and Trinity/VMaNGOS guild rosters. With the loopback MySQL fixture enabled, two worker processes read the same failed order before either claims it; exactly one may credit the refund. Seeded query plans verify the order and GM indexes, migration reruns and custom-index reuse. `php tests/public_assets_test.php` checks dependency selection and separate bundle names for both bundled themes.
+
+The next-batch browser cases cover server pagination, filters, deleted-item details, refund failure/retry, CSRF and method enforcement, cached guild pages, and public dependencies with minification enabled and disabled in both Default and Heaven. Each case runs on desktop and mobile. The full suite has a twenty-minute overall limit, while individual tests retain their existing one-minute limit.
+
 Admin asset browser checks visit basic log pages, account search, the dashboard, the email editor, news uploads, module management, the theme carousel and store icons. They check working controls, missing dependencies and browser script errors on desktop and mobile. Basic pages must omit unrelated plugin bundles. `php tests/admin_assets_test.php` also checks dependency files and load order.
 
 Armory browser checks use a realm inside the owned disposable auth schema, with 125 characters, items and guilds. They cover page boundaries, literal wildcard searches, empty guilds, malformed requests, escaped result names and retry after a failed request. `php tests/armory_search_test.php` exercises the real query builder with Trinity and VMaNGOS column maps on SQLite and the optional loopback MySQL server. MySQL runs with `ONLY_FULL_GROUP_BY`; query checks verify one character query per page and member aggregation restricted to the current guild page.

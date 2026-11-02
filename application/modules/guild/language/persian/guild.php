@@ -25,3 +25,6 @@ $lang['class'] = "کلاس";
 $lang['faction'] = "فرقه";
 $lang['level'] = "سطح";
 $lang['rank'] = "رتبه";
+$lang['empty_roster'] = "عضوی برای نمایش وجود ندارد.";
+$lang['roster_previous'] = "اعضای قبلی";
+$lang['roster_next'] = "اعضای بعدی";

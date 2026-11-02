@@ -25,4 +25,6 @@
  $lang['faction'] = "Faction";
  $lang['level'] = "Niveau";
  $lang['rank'] = "Rang";
- 
+$lang['empty_roster'] = "Aucun membre à afficher.";
+$lang['roster_previous'] = "Membres précédents";
+$lang['roster_next'] = "Membres suivants";

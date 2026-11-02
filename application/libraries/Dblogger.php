@@ -82,22 +82,23 @@ class Dblogger
         return $this->CI->logger_model->getLogCount();
     }
 
-    public function getGMLogs()
+    public function getGMLogs(string $type = '', $offset = 0, $limit = 25, int $gmId = 0): array
     {
-        $gmLogs = $this->CI->logger_model->getGMLogsDb();
-
-        for ($i = 0; $i < count((array)$gmLogs); $i++) {
-            if ($gmLogs[$i]["type"] == 'characters')
-            {
-                $realm = $this->CI->realms->getRealm($gmLogs[$i]["realm"]);
-                $characters = $realm->getCharacters();
-                $charId = $gmLogs[$i]["affected"];
-
-                $gmLogs[$i]["charName"] = $characters->characterExists($charId) ? $characters->getNameByGuid($charId) : "Character not found";
-            }
+        require_once __DIR__ . '/ListNames.php';
+        $rows = $this->CI->logger_model->getGMLogsDb($type, $offset, $limit, $gmId);
+        $ids = array_column($rows, 'gm_id'); $byRealm = [];
+        foreach ($rows as $row) {
+            if ($row['type'] === 'account') $ids[] = $row['affected'];
+            if ($row['type'] === 'characters') $byRealm[$row['realm']][] = $row['affected'];
         }
-
-        return $gmLogs;
+        $accounts = ListNames::accounts($this->CI->external_account_model->getConnection(), $ids);
+        $characters = ListNames::characters($this->CI->realms, $byRealm);
+        foreach ($rows as &$row) {
+            $row['gmName'] = $accounts[$row['gm_id']] ?? (string) $row['gm_id'];
+            $row['accountName'] = $accounts[$row['affected']] ?? (string) $row['affected'];
+            $row['charName'] = $characters[$row['realm']][$row['affected']] ?? lang('missing_character', 'gm');
+        }
+        return $rows;
     }
 
     public function createGMLog($action, $affected, $type, $realmId): void

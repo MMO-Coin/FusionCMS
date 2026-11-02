@@ -1,81 +1,29 @@
-<div class="card">
-	<div class="card-header">
-		{lang('failed_orders_week', 'store')}
-	</div>
-	<div class="card-body">
-	<span>
-		{lang('failed_orders_desc', 'store')}
-	</span>
-
-		{if $failed}
-			<table class="table table-responsive-md table-hover">
-				{foreach from=$failed item=failed_log}
-					<tr>
-						<td width="20%">{date("Y/m/d", $failed_log.timestamp)}</td>
-						<td width="16%">
-							<a href="{$url}admin/accounts/get/{$failed_log.user_id}" target="_blank">
-								{$failed_log.username}
-							</a>
-						</td>
-
-						<td width="35%">
-							{if $failed_log.vp_cost}<img src="{$url}application/images/icons/lightning.png" align="absmiddle" style="margin:0px;opacity:1;" /> <b>{$failed_log.vp_cost} {lang('vp', 'store')}</b>&nbsp;&nbsp;&nbsp;{/if}
-							{if $failed_log.dp_cost}<img src="{$url}application/images/icons/coins.png" align="absmiddle"  style="margin:0px;opacity:1;"/> <b>{$failed_log.dp_cost} {lang('dp', 'store')}</b>{/if}
-						</td>
-
-						<td>
-							<a data-bs-toggle="tooltip" data-placement="top" data-html="true" title="{foreach from=$failed_log.json item=item}{$item.itemName} {lang('to', 'store')} {$item.characterName}<br>{/foreach}">{count($failed_log.json)} {lang('items', 'store')}</a>
-						</td>
-
-						{if hasPermission("canRefundOrders")}
-							<td style="text-align:right;">
-								<a class="relative font-sans font-normal text-sm inline-flex items-center justify-center leading-5 no-underline h-8 px-3 py-2 space-x-1 border nui-focus transition-all duration-300 disabled:opacity-60 disabled:cursor-not-allowed hover:enabled:shadow-none text-muted-700 border-muted-300 dark:text-white dark:bg-muted-700 dark:border-muted-600 dark:hover:enabled:bg-muted-600 hover:enabled:bg-muted-50 dark:active:enabled:bg-muted-700/70 active:enabled:bg-muted-100 rounded-md" href="javascript:void(0)" onClick="Orders.refund({$failed_log.id}, this)">{lang('refund', 'store')}</a>
-							</td>
-						{/if}
-					</tr>
-				{/foreach}
-			</table>
-		{/if}
-	</div>
-</div>
-
-<div class="card">
-	<div class="card-header">
-		{lang('last_successful_orders', 'store')}
-	</div>
-	<div class="card-body">
-		<form class="input-group mb-3" onSubmit="Orders.search('successful'); return false">
-			<input class="form-control nui-focus border-muted-300 text-muted-600 placeholder:text-muted-300 dark:border-muted-700 dark:bg-muted-900/75 dark:text-muted-200 dark:placeholder:text-muted-500 dark:focus:border-muted-700 peer w-full border bg-white font-monospace transition-all duration-300 disabled:cursor-not-allowed disabled:opacity-75 px-2 h-10 py-2 text-sm leading-5 px-3 rounded" type="text" name="search_successful" id="search_successful" placeholder="{lang('search_by_username', 'store')}" style="width:90%;margin-right:5px;"/>
-
-			<button type="submit" class="btn btn-primary">{lang('search', 'store')}</button>
-		</form>
-
-		<span id="order_list_successful">
-		{if $completed}
-			{foreach from=$completed item=completed_log}
-				<table class="table table-responsive-md table-hover">
-					<tbody style="border-top:none">
-					<tr>
-						<td width="20%">{date("Y/m/d", $completed_log.timestamp)}</td>
-						<td width="16%">
-							<a href="{$url}admin/accounts/get/{$completed_log.user_id}" target="_blank">
-								{$completed_log.username}
-							</a>
-						</td>
-
-						<td width="35%">
-							{if $completed_log.vp_cost}<img src="{$url}application/images/icons/lightning.png" align="absmiddle" style="margin:0px;opacity:1;" /> <b>{$completed_log.vp_cost} {lang('vp', 'store')}</b>&nbsp;&nbsp;&nbsp;{/if}
-							{if $completed_log.dp_cost}<img src="{$url}application/images/icons/coins.png" align="absmiddle"  style="margin:0px;opacity:1;"/> <b>{$completed_log.dp_cost} {lang('dp', 'store')}</b>{/if}
-						</td>
-
-						<td>
-							<a data-toggle="tooltip" data-placement="top" data-html="true" title="{foreach from=$completed_log.json item=item}{$item.itemName} {lang('to', 'store')} {$item.characterName}<br />{/foreach}">{count($completed_log.json)} {lang('items', 'store')}</a>
-						</td>
-					</tbody>
-					</tr>
-				</table>
-			{/foreach}
-		{/if}
-	</span>
-	</div>
-</div>
+<div class="card"><div class="card-body">
+    <form method="get" class="d-flex flex-wrap gap-2 mb-3" action="{$url}store/admin_orders">
+        <label for="order-status">{lang('order_status', 'store')}</label>
+        <select id="order-status" name="status" class="form-select w-auto">
+            <option value="failed" {if $status == 'failed'}selected{/if}>{lang('failed_orders_week', 'store')}</option>
+            <option value="successful" {if $status == 'successful'}selected{/if}>{lang('successful_orders', 'store')}</option>
+        </select>
+        <label for="order-account">{lang('search_by_username', 'store')}</label>
+        <input id="order-account" name="account" value="{$search|escape}" maxlength="32" class="form-control w-auto">
+        <button class="btn btn-primary" type="submit">{lang('search', 'store')}</button>
+    </form>
+    <p>{lang('order_count', 'store')}: <span id="orders-total">{$total}</span></p>
+    <p id="orders-feedback" role="status" aria-live="polite"></p>
+    <div class="table-responsive"><table class="table table-hover" id="orders-table">
+        <thead><tr><th>{lang('order_number', 'store')}</th><th>{lang('date', 'store')}</th><th>{lang('account', 'store')}</th><th>VP / DP</th><th>{lang('items', 'store')}</th><th>{lang('actions', 'store')}</th></tr></thead>
+        <tbody>{foreach from=$results item=order}
+            <tr data-order="{$order.id}"><td>{$order.id}</td><td>{date('Y/m/d H:i', $order.timestamp)}</td>
+                <td><a href="{$url}admin/accounts/get/{$order.user_id}">{$order.username|escape}</a></td>
+                <td>{$order.vp_cost|escape} / {$order.dp_cost|escape}</td>
+                <td><details><summary>{count($order.json)} {lang('items', 'store')}</summary><ul>{foreach from=$order.json item=item}<li>{$item.itemName|escape} {lang('to', 'store')} {$item.characterName|escape}</li>{/foreach}</ul></details></td>
+                <td>{if $order.completed == 0 && hasPermission('canRefundOrders')}<button type="button" class="btn btn-outline-danger" onclick="Orders.refund({$order.id}, this)">{lang('refund', 'store')}</button>{/if}</td>
+            </tr>
+        {foreachelse}<tr><td colspan="6">{lang('no_matches', 'store')}</td></tr>{/foreach}</tbody>
+    </table></div>
+    <nav class="d-flex gap-3" aria-label="{lang('orders', 'store')}">
+        {if $previous}<a rel="prev" href="{$previous|escape}">{lang('newer_orders', 'store')}</a>{/if}
+        {if $next}<a rel="next" href="{$next|escape}">{lang('older_orders', 'store')}</a>{/if}
+    </nav>
+</div></div>

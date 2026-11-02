@@ -3,159 +3,91 @@
 use CodeIgniter\Events\Events;
 use MX\MX_Controller;
 
-/**
- * Admin_orders Controller Class
- * @property store_model $store_model store_model Class
- */
 class Admin_orders extends MX_Controller
 {
     public function __construct()
     {
-        // Make sure to load the administrator library!
         $this->load->library('administrator');
         $this->load->model('store_model');
-
         parent::__construct();
-
-        requirePermission("canViewOrders");
+        requirePermission('canViewOrders');
+        require_once APPPATH . 'libraries/ListNames.php';
     }
 
     public function index()
     {
-        // Change the title
+        $status = $this->input->get('status') === 'successful' ? 'successful' : 'failed';
+        $search = $this->input->get('account');
+        $search = is_string($search) ? mb_substr(trim($search), 0, 32) : '';
+        $userId = $search !== '' ? (int) $this->user->getId($search) : 0;
+        $completed = $status === 'successful' ? 1 : 0;
+        $total = $search !== '' && !$userId ? 0 : $this->store_model->countOrders($completed, $userId);
+        $offset = PageBounds::clamp($this->input->get('offset'), $total, 25);
+        $rows = $total ? $this->store_model->getOrders($completed, $offset, 25, $userId) : [];
+        $rows = $this->details($rows);
+        $base = $this->template->page_url . 'store/admin_orders?' . http_build_query(['status' => $status, 'account' => $search]);
+        $data = ['url' => $this->template->page_url, 'results' => $rows, 'status' => $status, 'search' => $search, 'total' => $total,
+            'previous' => $offset > 0 ? $base . '&offset=' . max(0, $offset - 25) : '',
+            'next' => $offset + count($rows) < $total ? $base . '&offset=' . ($offset + 25) : ''];
+        foreach (['refund_failed', 'refund_done', 'refund_question', 'refund'] as $key) clientLang($key, 'store');
         $this->administrator->setTitle(lang('orders', 'store'));
-
-        $completed = $this->store_model->getOrders(1);
-        $failed = $this->store_model->getOrders(0);
-
-        if ($completed) {
-            foreach ($completed as $k => $v) {
-                $completed[$k]["username"] = $this->user->getUsername($v['user_id']);
-                $completed[$k]["json"] = json_decode($v['cart'], true);
-
-                foreach ($completed[$k]["json"] as $key => $value) {
-                    $item = $this->store_model->getItem($value['id']);
-
-                    if ($item && isset($value['character'])) {
-                        $character = $this->realms->getRealm($item['realm'])->getCharacters()->getNameByGuid($value['character']);
-                    }
-
-                    $completed[$k]['json'][$key]['itemName'] = $item ? $item['name'] : lang('unknown', 'store');
-                    $completed[$k]['json'][$key]['characterName'] = (isset($character)) ? $character : lang('unknown', 'store');
-                }
-            }
-        }
-
-        if ($failed) {
-            foreach ($failed as $k => $v) {
-                $failed[$k]["username"] = $this->user->getUsername($v['user_id']);
-                $failed[$k]["json"] = json_decode($v['cart'], true);
-
-                foreach ($failed[$k]["json"] as $key => $value) {
-                    $item = $this->store_model->getItem($value['id']);
-
-                    if ($item && isset($value['character'])) {
-                        $character = $this->realms->getRealm($item['realm'])->getCharacters()->getNameByGuid($value['character']);
-                    }
-
-                    $failed[$k]['json'][$key]['itemName'] = $item ? $item['name'] : lang('unknown', 'store');
-                    $failed[$k]['json'][$key]['characterName'] = (isset($character)) ? $character : lang('unknown', 'store');
-                }
-            }
-        }
-
-        // Prepare my data
-        $data = array(
-            'completed' => $completed,
-            'failed' => $failed,
-            'url' => $this->template->page_url,
-        );
-
-        // Load my view
-        $output = $this->template->loadPage("admin_orders.tpl", $data);
-
-        // Put my view in the main box with a headline
-        $content = $this->administrator->box(lang('orders', 'store'), $output);
-
-        // Output my content. The method accepts the same arguments as template->view
-        $this->administrator->view($content, false, "modules/store/js/admin_orders.js");
+        $this->administrator->view($this->administrator->box(lang('orders', 'store'), $this->template->loadPage('admin_orders.tpl', $data)), false, 'modules/store/js/admin_orders.js');
     }
 
-    public function search($type)
+    private function details(array $rows): array
     {
-        $string = $this->input->post('string');
-
-        if (!$string || !$type || !in_array($type, array('successful', 'failed'))) {
-            die();
-        } else {
-            $type = ($type == 'successful');
-
-            if (preg_match("/^[a-zA-Z0-9]*$/", $string) && strlen($string) > 3 && strlen($string) < 15) {
-                // Username
-                $user_id = $this->user->getId($string);
-
-                if (!$user_id) {
-                    die("<span>" . lang('unknown_account', 'store') . "</span>");
-                }
-
-                $results = $this->store_model->findByUserId($type, $user_id);
-            } else {
-                $results = $this->store_model->getOrders($type);
+        $itemIds = [];
+        foreach ($rows as &$row) {
+            $cart = json_decode($row['cart'], true);
+            $row['json'] = is_array($cart) ? array_values(array_filter($cart, 'is_array')) : [];
+            foreach ($row['json'] as &$entry) {
+                $entry['id'] = filter_var($entry['id'] ?? 0, FILTER_VALIDATE_INT) ?: 0;
+                $entry['character'] = filter_var($entry['character'] ?? 0, FILTER_VALIDATE_INT) ?: 0;
             }
-
-            if (!$results) {
-                die("<span>" . lang('no_matches', 'store') . "</span>");
-            }
-
-            foreach ($results as $k => $v) {
-                $results[$k]["username"] = $this->user->getUsername($v['user_id']);
-                $results[$k]["json"] = json_decode($v['cart'], true);
-
-                foreach ($results[$k]["json"] as $key => $value) {
-                    $item = $this->store_model->getItem($value['id']);
-
-                    if ($item && isset($value['character'])) {
-                        $character = $this->realms->getRealm($item['realm'])->getCharacters()->getNameByGuid($value['character']);
-                    }
-
-                    $results[$k]['json'][$key]['itemName'] = $item ? $item['name'] : lang('unknown', 'store');
-                    $results[$k]['json'][$key]['characterName'] = (isset($character)) ? $character : lang('unknown', 'store');
-                }
-            }
-
-            $data = array(
-                'url' => $this->template->page_url,
-                'results' => $results
-            );
-
-            $output = $this->template->loadPage('admin_list.tpl', $data);
-
-            die($output);
+            unset($entry);
+            foreach ($row['json'] as $entry) $itemIds[] = (int) ($entry['id'] ?? 0);
         }
+        unset($row);
+        $items = $this->store_model->getItemsByIds($itemIds);
+        $accounts = ListNames::accounts($this->external_account_model->getConnection(), array_column($rows, 'user_id'));
+        $byRealm = [];
+        foreach ($rows as $row) foreach ($row['json'] as $entry) {
+            $item = $items[$entry['id'] ?? 0] ?? null;
+            if ($item && !empty($entry['character'])) $byRealm[$item['realm']][] = (int) $entry['character'];
+        }
+        $characters = ListNames::characters($this->realms, $byRealm);
+        foreach ($rows as &$row) {
+            $row['username'] = $accounts[$row['user_id']] ?? lang('unknown', 'store');
+            foreach ($row['json'] as &$entry) {
+                $item = $items[$entry['id'] ?? 0] ?? null;
+                $entry['itemName'] = $item['name'] ?? lang('unknown', 'store');
+                $entry['characterName'] = $item ? ($characters[$item['realm']][$entry['character'] ?? 0] ?? lang('unknown', 'store')) : lang('unknown', 'store');
+            }
+            unset($entry);
+        }
+        return $rows;
+    }
+
+    public function search($type = 'failed')
+    {
+        $search = $this->input->post('string');
+        redirect($this->template->page_url . 'store/admin_orders?' . http_build_query(['status' => $type === 'successful' ? 'successful' : 'failed', 'account' => is_string($search) ? $search : '']));
     }
 
     public function refund($id = false)
     {
-        requirePermission("canRefundOrders");
-
-        if (!$id || !is_numeric($id)) {
-            die(lang('bad_id', 'store'));
-        }
-
-        $order = $this->store_model->getOrder($id);
-
-        if ($order) {
-            $this->store_model->refund($order['user_id'], $order['vp_cost'], $order['dp_cost']);
-            $this->store_model->deleteLog($id);
-
-            // Add log
-            $this->dblogger->createLog("admin", "refund", "Refunded order", ['ID' => $id, 'User' =>  $order['user_id'], 'VP' =>  $order['vp_cost'], 'DP' =>  $order['dp_cost']]);
-
+        requirePermission('canRefundOrders');
+        header('Content-Type: application/json; charset=utf-8');
+        if ($this->input->method() !== 'post') { http_response_code(405); header('Allow: POST'); die(json_encode(['ok' => false])); }
+        $id = filter_var($id, FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]);
+        if (!$id) { http_response_code(400); die(json_encode(['ok' => false])); }
+        try { $order = $this->store_model->refundOrder($id); }
+        catch (Throwable $error) { log_message('error', 'Store refund failed for order ' . $id); http_response_code(503); die(json_encode(['ok' => false])); }
+        if (!$order) { http_response_code(409); die(json_encode(['ok' => false])); }
+        try {
+            $this->dblogger->createLog('admin', 'refund', 'Refunded order', ['ID' => $id, 'User' => $order['user_id'], 'VP' => $order['vp_cost'], 'DP' => $order['dp_cost']]);
             Events::trigger('onRefundStore', $id, $order['user_id'], $order['vp_cost'], $order['dp_cost']);
-        } else {
-            die(lang('invalid_order', 'store'));
-        }
-
-        die("done");
+        } catch (Throwable $error) { log_message('error', 'Store refund notification failed for order ' . $id); }
+        die(json_encode(['ok' => true, 'id' => $id]));
     }
 }

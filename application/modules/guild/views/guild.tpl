@@ -4,7 +4,7 @@
 	{else}
 		<div class="col-lg-4 py-5 pe-lg-5">
 			<div class="section-header d-flex justify-content-between">
-				{$guild.guildName}
+				{$guild.guildName|escape}
 			</div>
 			<div class="setion-body">
 				<div class="mb-4 motd">
@@ -16,7 +16,7 @@
 						{/if}
 					</div>
 					<div class="mt-4">
-						<span class="fw-bold">{if $members}{count($members)}{/if}</span> {lang("members", "guild")}, {$realmName}
+						<span class="fw-bold">{$member_count}</span> {lang("members", "guild")}, {$realmName|escape}
 					</div>
 				</div>
 			</div>
@@ -25,7 +25,7 @@
 		<div class="col-lg-8 py-lg-5 pb-5 pb-lg-0">
 			<div class="section-header">{lang("members", "guild")}</div>
 			<div class="section-body">
-				<table class="table table-responsive text-nowrap nice_table">
+				<div class="table-responsive"><table class="table text-nowrap nice_table">
 					<thead>
 						<tr>
 							<th>{lang("members", "guild")}</th>
@@ -36,33 +36,22 @@
 							<th>{lang("rank", "guild")}</th>
 						</tr>
 					</thead>
-					<tbody>
-					<tr>
-                        {if $leader}
-                            <td><a href="{$url}character/{$realmId}/{$leader.guid}">{$leader.name}</a> <i class="fa-duotone fa-crown"></i></td>
-                            <td><img src="{$url}application/images/stats/{$leader.raceId}-{$leader.gender}.gif" width="20px"></td>
-                            <td><img src="{$url}application/images/stats/{$leader.classId}.gif" width="20px"></td>
-                            <td><img src="{$url}application/images/factions/{$leader.faction}.png" width="20px"></td>
-                            <td>{$leader.level}</td>
-                            <td>{lang("leader", "guild")}</td>
-						{/if}
-						{if $members}
-							{foreach from=$members item=character}
-								{if $character.guid != $guild.leaderguid}
-								<tr>
-									<td><a href="{$url}character/{$realmId}/{$character.guid}">{$character.name}</a></td>
-									<td><img src="{$url}application/images/stats/{$character.raceId}-{$character.gender}.gif" width="20px"></td>
-									<td><img src="{$url}application/images/stats/{$character.classId}.gif" width="20px"></td>
-									<td><img src="{$url}application/images/factions/{$character.faction}.png" width="20px"></td>
-									<td>{$character.level}</td>
-									<td>{$character.rname}</td>
-								</tr>
-								{/if}
-							{/foreach}
-						{/if}
-					</tr>
+                    <tbody>
+                        {foreach from=$members item=character}
+                        <tr data-member="{$character.guid}">
+                            <td><a href="{$url}character/{$realmId}/{$character.guid}">{$character.name|escape}</a>{if $character.guid == $guild.leaderguid} <i class="fa-duotone fa-crown" aria-label="{lang('leader', 'guild')}"></i>{/if}</td>
+                            <td><img src="{$url}application/images/stats/{$character.raceId}-{$character.gender}.gif" width="20" alt="{$character.raceId}"></td>
+                            <td><img src="{$url}application/images/stats/{$character.classId}.gif" width="20" alt="{$character.classId}"></td>
+                            <td><img src="{$url}application/images/factions/{$character.faction}.png" width="20" alt="{$character.faction}"></td>
+                            <td>{$character.level|escape}</td><td>{$character.rname|escape}</td>
+                        </tr>
+                        {foreachelse}<tr><td colspan="6">{lang('empty_roster', 'guild')}</td></tr>{/foreach}
 					</tbody>
-				</table>
+                </table></div>
+                <nav class="d-flex gap-3 my-3" aria-label="{lang('members', 'guild')}">
+                    {if $previous}<a rel="prev" href="{$previous|escape}">{lang('roster_previous', 'guild')}</a>{/if}
+                    {if $next}<a rel="next" href="{$next|escape}">{lang('roster_next', 'guild')}</a>{/if}
+                </nav>
 			</div>
 		</div>
 	{/if}

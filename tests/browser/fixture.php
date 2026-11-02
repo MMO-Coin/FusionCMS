@@ -57,11 +57,11 @@ function assertOwner(mysqli $db, string $database, string $nonce): void {
 }
 function resetFixture(mysqli $db, array $config): void {
     $db->select_db($config['cms']);
-    foreach (['donate_mmo_transactions', 'monthly_income', 'failed_logins', 'remember_me_tokens', 'password_recovery_key', 'email_log', 'account_session_versions', 'account_totp_uses', 'account_sessions', 'private_message', 'comments', 'article_tag', 'articles', 'realms'] as $table) $db->query("DELETE FROM `$table`");
+    foreach (['donate_mmo_transactions', 'monthly_income', 'failed_logins', 'remember_me_tokens', 'password_recovery_key', 'email_log', 'account_session_versions', 'account_totp_uses', 'account_sessions', 'private_message', 'comments', 'article_tag', 'articles', 'realms', 'order_log', 'gm_log', 'store_items', 'image_slider'] as $table) $db->query("DELETE FROM `$table`");
     $db->query('DELETE FROM account_data WHERE id > 3');
     $db->query('UPDATE account_data SET dp = 0, vp = 0');
     $db->select_db($config['auth']);
-    foreach (['characters', 'guild', 'guild_member', 'item_template'] as $table) $db->query("DELETE FROM `$table`");
+    foreach (['characters', 'guild', 'guild_member', 'guild_rank', 'item_template'] as $table) $db->query("DELETE FROM `$table`");
     $db->query('DELETE FROM account WHERE id > 3');
     $db->query("UPDATE account SET sha_pass_hash = UPPER(SHA1(CONCAT(username, ':BROWSERTEST123'))), totp_secret = NULL, token_key = NULL");
     foreach (glob($config['root'] . '/site/writable/cache/throttle/*.json') as $file) unlink($file);
@@ -72,7 +72,8 @@ function resetFixture(mysqli $db, array $config): void {
     $editor->set('totp_secret', true);
     $editor->save();
     $editor = new ConfigEditor($config['root'] . '/site/application/config/fusion.php');
-    $editor->set('cache', false); $editor->save();
+    $editor->set('cache', false); $editor->set('theme', 'default'); $editor->save();
+    copy(dirname(__DIR__, 2) . '/application/config/performance.php', $config['root'] . '/site/application/config/performance.php');
     foreach (['news', 'messages'] as $module) copy(dirname(__DIR__, 2) . "/application/modules/$module/config/$module.php", $config['root'] . "/site/application/modules/$module/config/$module.php");
     foreach (['news_*.cache', 'comments_*.cache', 'messages/*'] as $pattern) {
         foreach (glob($config['root'] . '/site/writable/cache/data/' . $pattern) as $file) if (is_file($file)) unlink($file);
@@ -105,9 +106,10 @@ if ($action === 'setup') {
     $db->query('CREATE TABLE account_access (AccountId INT, SecurityLevel INT, RealmID INT DEFAULT -1)');
     $db->query('CREATE TABLE account_banned (id INT, banreason VARCHAR(255), active INT, bandate INT, unbandate INT, bannedby VARCHAR(50))');
     $db->query('CREATE TABLE ip_banned (ip VARCHAR(45), banreason VARCHAR(255), bandate INT, unbandate INT, bannedby VARCHAR(50))');
-    $db->query('CREATE TABLE characters (guid INT PRIMARY KEY, name VARCHAR(100), race INT, gender INT, class INT, level INT, online INT DEFAULT 0)');
-    $db->query('CREATE TABLE guild (guildid INT PRIMARY KEY, name VARCHAR(100), leaderguid INT)');
-    $db->query('CREATE TABLE guild_member (guildid INT, guid INT, INDEX (guildid))');
+    $db->query('CREATE TABLE characters (guid INT PRIMARY KEY, name VARCHAR(100), race INT, gender INT, class INT, level INT, online INT DEFAULT 0, account INT DEFAULT 1)');
+    $db->query('CREATE TABLE guild (guildid INT PRIMARY KEY, name VARCHAR(100), leaderguid INT, motd TEXT, info TEXT, createdate INT)');
+    $db->query('CREATE TABLE guild_member (guildid INT, guid INT, rank INT DEFAULT 0, INDEX (guildid))');
+    $db->query('CREATE TABLE guild_rank (guildid INT, rid INT, rname VARCHAR(60), rights INT)');
     $db->query('CREATE TABLE item_template (entry INT PRIMARY KEY, name VARCHAR(100), ItemLevel INT, RequiredLevel INT, InventoryType INT, Quality INT, class INT, subclass INT)');
     foreach ([1 => 'E2EPLAYER', 2 => 'E2EOTHER', 3 => 'E2EOWNER'] as $id => $username) {
         $hash = strtoupper(sha1($username . ':BROWSERTEST123'));
@@ -244,13 +246,13 @@ if ($action === 'cleanup') {
     $db->select_db($config['auth']);
     for ($id = 1; $id <= 125; $id++) {
         $name = sprintf('Search%03d', $id);
-        $db->query("INSERT INTO characters VALUES ($id, '$name', 1, 0, 1, 60, 0)");
+        $db->query("INSERT INTO characters (guid,name,race,gender,class,level,online) VALUES ($id, '$name', 1, 0, 1, 60, 0)");
         $leader = $id === 2 ? 9999 : 1;
-        $db->query("INSERT INTO guild VALUES ($id, '$name', $leader)");
-        if ($id !== 1) $db->query("INSERT INTO guild_member VALUES ($id, $id)");
+        $db->query("INSERT INTO guild (guildid, name, leaderguid) VALUES ($id, '$name', $leader)");
+        if ($id !== 1) $db->query("INSERT INTO guild_member (guildid, guid) VALUES ($id, $id)");
         $db->query("INSERT INTO item_template VALUES ($id, '$name', 60, 50, 13, 3, 2, 7)");
     }
-    $character = $db->prepare('INSERT INTO characters VALUES (?, ?, 1, 0, 1, 60, 0)');
+    $character = $db->prepare('INSERT INTO characters (guid,name,race,gender,class,level,online) VALUES (?, ?, 1, 0, 1, 60, 0)');
     foreach (['Literal%Name', 'Literal_Name', "O'Name", '<b>Literal</b>', 'Percent%41Name'] as $i => $name) {
         $id = 200 + $i; $character->bind_param('is', $id, $name); $character->execute();
     }
@@ -260,6 +262,52 @@ if ($action === 'cleanup') {
     if (!is_dir($folder)) mkdir($folder, 0777, true);
     for ($id = 1; $id <= 125; $id++) file_put_contents($folder . '/item_1_' . $id . '.cache', json_encode(['expiration' => time() + 3600, 'content' => ['icon' => 'inv_misc_questionmark']]));
     echo 'Seeded the owned Armory realm fixture.';
+} elseif ($action === 'seed-next-lists') {
+    $db->select_db($config['auth']);
+    $db->query('UPDATE guild_member SET guildid=1');
+    $db->query('INSERT INTO guild_member (guildid, guid) VALUES (1, 1)');
+    $db->query("INSERT INTO guild_rank VALUES (1,0,'Member',1)");
+    $db->query("UPDATE guild SET motd='Browser guild' WHERE guildid=1");
+    $db->query("UPDATE guild SET motd='' WHERE guildid<>1");
+    $db->select_db($config['cms']);
+    $db->query("INSERT INTO store_items (id,name,realm) VALUES (1,'Test Sword',1)");
+    $order = $db->prepare('INSERT INTO order_log (id, completed, user_id, vp_cost, dp_cost, cart, timestamp) VALUES (?, ?, ?, 1, 2, ?, ?)');
+    $now = time();
+    foreach ([0,1] as $status) for ($i=1; $i<=65; $i++) {
+        $id = $i + $status * 100; $user = $i % 2 ? 1 : 2;
+        $cart = json_encode([['id'=>1,'character'=>$i], ['id'=>999,'character'=>999]]);
+        $order->bind_param('iiisi', $id, $status, $user, $cart, $now); $order->execute();
+    }
+    $log = $db->prepare('INSERT INTO gm_log (id,action,type,affected,gm_id,realm,ip,time) VALUES (?, ?, ?, 1, ?, ?, \'127.0.0.1\', 1793500000)');
+    for ($id=1; $id<=85; $id++) {
+        $actionText = '<b>GM log ' . $id . '</b>'; $type = $id % 2 ? 'characters' : 'account'; $gm = $id % 3 ? 3 : 1; $realmId = $id % 15 ? 1 : 999;
+        $log->bind_param('issii', $id, $actionText, $type, $gm, $realmId); $log->execute();
+    }
+    echo 'Seeded bounded store, GM and guild lists.';
+} elseif ($action === 'next-state') {
+    $db->select_db($config['cms']);
+    echo json_encode(['balances'=>$db->query('SELECT id,vp,dp FROM account_data ORDER BY id')->fetch_all(MYSQLI_ASSOC), 'orders'=>$db->query('SELECT id,completed FROM order_log ORDER BY id')->fetch_all(MYSQLI_ASSOC)], JSON_THROW_ON_ERROR);
+} elseif ($action === 'public-media') {
+    require_once $site . '/application/libraries/ConfigEditor.php';
+    $editor = new ConfigEditor($site . '/application/config/fusion.php'); $editor->set('slider', ($argv[3] ?? '') === 'slider'); $editor->save();
+    $db->select_db($config['cms']);
+    $db->query('DELETE FROM articles'); $db->query('DELETE FROM image_slider');
+    $article = $db->prepare('INSERT INTO articles (id,headline,content,author_id,timestamp,comments,type,type_content) VALUES (1,\'Carousel article\',\'Browser media\',1,1793500000,0,1,?)');
+    $images = json_encode(['fixture-a.png','fixture-b.png']); $article->bind_param('s', $images); $article->execute();
+    foreach (['fixture-a.png','fixture-b.png'] as $name) {
+        $db->query("INSERT INTO image_slider (image,header,body,footer,link,`order`) VALUES ('$name','Browser slide','Browser slide body','','',1)");
+        foreach (['/writable/uploads/news', '/application/themes/default/assets/images/slides'] as $relative) {
+            $folder = $site . $relative; if (!is_dir($folder)) mkdir($folder, 0777, true);
+            file_put_contents($folder . '/' . $name, base64_decode('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aWQAAAABJRU5ErkJggg=='));
+        }
+    }
+} elseif ($action === 'public-theme') {
+    $theme = $argv[3] ?? ''; $mode = $argv[4] ?? '';
+    if (!in_array($theme, ['default','heaven'], true) || !in_array($mode, ['minified','files'], true)) throw new RuntimeException('Invalid public theme fixture');
+    require_once $site . '/application/libraries/ConfigEditor.php';
+    $editor = new ConfigEditor($site . '/application/config/fusion.php'); $editor->set('theme', $theme); $editor->save();
+    $editor = new ConfigEditor($site . '/application/config/performance.php');
+    $editor->set('enable_minify_js', $mode === 'minified'); $editor->set('enable_minify_css', $mode === 'minified'); $editor->save();
 } elseif ($action === 'seed-public-lists') {
     require_once $site . '/application/libraries/ConfigEditor.php';
     $db->select_db($config['cms']);

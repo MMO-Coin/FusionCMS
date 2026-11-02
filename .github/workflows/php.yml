@@ -97,6 +97,15 @@ jobs:
     - name: Run request throttling regression tests
       run: php tests/throttler_test.php
 
+    - name: Run store consistency, bounded lists, guild roster and query plan checks
+      env:
+        FUSION_TEST_MYSQL_HOST: 127.0.0.1
+        FUSION_TEST_MYSQL_PASSWORD: fusion_test
+      run: php tests/next_batch_test.php
+
+    - name: Run public asset dependency checks
+      run: php tests/public_assets_test.php
+
     - name: Run donation security and schema regression tests
       env:
         FUSION_TEST_MYSQL_HOST: 127.0.0.1

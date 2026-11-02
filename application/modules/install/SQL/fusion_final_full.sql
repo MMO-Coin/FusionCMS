@@ -808,7 +808,9 @@ CREATE TABLE `gm_log` (
 	`type` MEDIUMTEXT NOT NULL COMMENT 'ticket, characters, account, ...' COLLATE 'utf8_unicode_ci',
 	`realm` INT(1) NOT NULL,
 	`time` INT(11) NOT NULL,
-	PRIMARY KEY (`id`) USING BTREE
+	PRIMARY KEY (`id`) USING BTREE,
+  INDEX `idx_gm_time_id` (`time`, `id`) USING BTREE,
+  INDEX `idx_gm_actor_time_id` (`gm_id`, `time`, `id`) USING BTREE
 ) ENGINE=InnoDB AUTO_INCREMENT=1 CHARSET=utf8 COLLATE=utf8_unicode_ci ROW_FORMAT=Dynamic;
 
 
@@ -869,7 +871,9 @@ CREATE TABLE `order_log`  (
   `dp_cost` int(11) NULL DEFAULT NULL,
   `cart` text CHARACTER SET utf8 COLLATE utf8_unicode_ci NULL DEFAULT NULL,
   `timestamp` int(11) NULL DEFAULT NULL,
-  PRIMARY KEY (`id`) USING BTREE
+  PRIMARY KEY (`id`) USING BTREE,
+  INDEX `idx_orders_status_time_id` (`completed`, `timestamp`, `id`) USING BTREE,
+  INDEX `idx_orders_user_time_id` (`completed`, `user_id`, `timestamp`, `id`) USING BTREE
 ) ENGINE=InnoDB AUTO_INCREMENT=1 DEFAULT CHARSET=utf8 COLLATE=utf8_unicode_ci ROW_FORMAT=Dynamic;
 
 -- ----------------------------

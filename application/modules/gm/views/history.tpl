@@ -13,6 +13,14 @@
         </div>
         <div class="col-lg-8 py-lg-5 pb-5 pb-lg-0 table-responsive">
             <div class="section-header"><span>{lang("history_list", "gm")}</span></div>
+            <form method="get" class="d-flex flex-wrap gap-2 my-3" action="{$url}gm/history">
+                <label for="history-type">{lang('type', 'gm')}</label>
+                <input class="form-control" id="history-type" name="type" maxlength="32" value="{$filter_type|escape}">
+                <label for="history-account">{lang('gm', 'gm')}</label>
+                <input class="form-control" id="history-account" name="account" maxlength="32" value="{$search|escape}">
+                <button class="nice_button" type="submit">{lang('filter_history', 'gm')}</button>
+            </form>
+            <p>{lang('history_count', 'gm')}: <span id="history-total">{$total}</span></p>
             {if $gmLogs}
                 <table class="table table-bordered table-striped mb-0 dataTable no-footer nice_table">
                     <thead>
@@ -28,36 +36,34 @@
 
                     <tbody>
                         {foreach from=$gmLogs item=log}
-                            <tr role="row">
-                                <td>{$log.action}</td>
+                            <tr data-history="{$log.id}">
+                                <td>{$log.action|escape}</td>
                                 <td>
-                                    {$log.type}
+                                    {$log.type|escape}
                                 </td>
                                 <td>
                                     {if $log.type == 'account'}
-                                        <a data-bs-toggle="tooltip" data-bs-placement="top" title="View profile" href="{$url}profile/{$log.affected}" target="_blank">{$CI->user->getUsername($log.affected)}</a>
+                                        <a data-bs-toggle="tooltip" data-bs-placement="top" title="View profile" href="{$url}profile/{$log.affected|escape}" target="_blank">{$log.accountName|escape}</a>
                                     {elseif $log.type == 'characters'}
-                                        <a data-bs-toggle="tooltip" data-bs-placement="top" title="View character" href="{$url}character/{$log.realm}/{$log.affected}" target="_blank">{$log.charName}</a>
+                                        <a data-bs-toggle="tooltip" data-bs-placement="top" title="View character" href="{$url}character/{$log.realm}/{$log.affected|escape}" target="_blank">{$log.charName|escape}</a>
                                     {else}
-                                        {$log.affected}
+                                        {$log.affected|escape}
                                     {/if}
                                 </td>
-                                <td><a data-bs-toggle="tooltip" data-bs-placement="top" title="View profile" href="{$url}profile/{$log.gm_id}" target="_blank">{$CI->user->getUsername($log.gm_id)}</a></td>
-                                <td>{$log.ip}</td>
+                                <td><a data-bs-toggle="tooltip" data-bs-placement="top" title="View profile" href="{$url}profile/{$log.gm_id}" target="_blank">{$log.gmName|escape}</a></td>
+                                <td>{$log.ip|escape}</td>
                                 <td>{date("Y-m-d H:i:s", $log.time)}</td>
                             </tr>
                         {/foreach}
-                    <tbody>
+                    </tbody>
                 </table>
             {else}
                 <div style="padding:20px;">{lang("no_data", "gm")}</div>
             {/if}
+            <nav class="d-flex gap-3 my-3" aria-label="{lang('history_list', 'gm')}">
+                {if $previous}<a rel="prev" href="{$previous|escape}">{lang('history_previous', 'gm')}</a>{/if}
+                {if $next}<a rel="next" href="{$next|escape}">{lang('history_next', 'gm')}</a>{/if}
+            </nav>
         </div>
     </div>
 </div>
-
-<script>
-    $(document).ready(function() {
-        $('.nice_table').DataTable();
-    } );
-</script>

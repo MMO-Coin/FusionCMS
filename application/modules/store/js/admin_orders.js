@@ -1,45 +1,19 @@
 var Orders = {
-
-	search: function(type)
-	{
-		var string = $("#search_" + type).val();
-		
-		$("#order_list_" + type).html('<i class="fa-duotone fa-spinner fa-xl"></i>');
-	
-		$.post(Config.URL + "store/admin_orders/search/" + type, {string: string, csrf_token_name: Config.CSRF}, function(data)
-		{
-			$("#order_list_" + type).fadeOut(150, function()
-			{
-				$(this).html(data).slideDown(500, function()
-				{
-					$('[data-toggle="tooltip"]').tooltip();
-				});
-			});
-		});	
-	},
-
-	refund: function(id, element)
-	{
-		Swal.fire({
-				title: 'Do you really want to refund?',
-				text: "You won't be able to revert this!",
-				icon: 'warning',
-				showCancelButton: true,
-				confirmButtonColor: '#3085d6',
-				cancelButtonColor: '#d33',
-				confirmButtonText: 'Yes, refund!'
-			}).then((result) => {
-			if (result.isConfirmed) {
-				$(element).parents("tr").slideUp(300, function()
-				{
-					$(this).remove();
-				});
-
-				$.get(Config.URL + "store/admin_orders/refund/" + id), function(data)
-				{
-					console.log(data);
-				};
-			}
-			})
-	}
-}
+    refund: function(id, button) {
+        if (button.disabled) return;
+        button.disabled = true;
+        Swal.fire({text: lang('refund_question', 'store'), icon: 'warning', showCancelButton: true,
+            confirmButtonText: lang('refund', 'store')}).then(function(result) {
+            if (!result.isConfirmed) { button.disabled = false; return; }
+            $('#orders-feedback').text('');
+            $.ajax({url: Config.URL + 'store/admin_orders/refund/' + id, method: 'POST', dataType: 'json',
+                data: {csrf_token_name: Config.CSRF}}).done(function(data) {
+                if (!data.ok) { $('#orders-feedback').text(lang('refund_failed', 'store')); return; }
+                $(button).closest('tr').remove();
+                $('#orders-total').text(Math.max(0, Number($('#orders-total').text()) - 1));
+                $('#orders-feedback').text(lang('refund_done', 'store'));
+            }).fail(function() { $('#orders-feedback').text(lang('refund_failed', 'store')); })
+                .always(function() { button.disabled = false; });
+        });
+    }
+};

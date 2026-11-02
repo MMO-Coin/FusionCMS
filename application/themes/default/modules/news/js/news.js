@@ -25,6 +25,7 @@ const News = (() => {
      * @return void
      */
     self.fireCarousel = () => {
+        if (typeof $.fn.owlCarousel !== 'function') return;
         $(self.Selector.carousel).owlCarousel({
             'nav': false,
             'dots': true,

@@ -195,7 +195,7 @@ class Pay extends MX_Controller
         // Let the user pay before we start sending any items!
         $this->subtractPoints();
 
-        $this->store_model->logOrder($this->vp, $this->dp, $cart);
+        $orderId = $this->store_model->logOrder($this->vp, $this->dp, $cart);
 
         // Loop through all realms
         foreach ($realmItems as $realm => $characters) {
@@ -211,7 +211,10 @@ class Pay extends MX_Controller
         // Load the checkout view
         $output = $this->template->loadPage("success.tpl", ['url' => $this->template->page_url, 'message' => $this->config->item('success_message')]);
 
-        $this->store_model->completeOrder();
+        if (!$this->store_model->completeOrder($orderId)) {
+            http_response_code(409);
+            die(lang('order_changed', 'store') . ' #' . $orderId);
+        }
 
         Events::trigger('onCompleteOrderStore', $cart);
 

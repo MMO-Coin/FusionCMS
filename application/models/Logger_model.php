@@ -79,27 +79,25 @@ class Logger_model extends CI_Model
             ]);
     }
 
-    public function getGMLogsDb(string $logType = "", int $offset = 0, int $limit = 0): ?array
+    private function gmLogs(string $type, int $gmId)
     {
-        $builder = $this->db->table('gm_log')->select();
-        if ($logType != "") {
-            $builder->where('type', $logType);
-        }
-        $builder->orderBy('time', 'DESC');
-        if ($limit > 0 && $offset == 0) {
-            $builder->limit($limit);
-        }
-        if ($limit > 0 && $offset > 0) {
-            $builder->limit($limit, $offset);
-        }
-        $query = $builder->get();
+        $builder = $this->db->table('gm_log');
+        if ($type !== '') $builder->where('type', $type);
+        if ($gmId > 0) $builder->where('gm_id', $gmId);
+        return $builder;
+    }
 
-        // Get the results
-        if ($query->getNumRows() > 0) {
-            return $query->getResultArray();
-        } else {
-            return null;
-        }
+    public function getGMLogsDb(string $logType = '', $offset = 0, $limit = LogPagination::DEFAULT_SIZE, int $gmId = 0): array
+    {
+        $bounds = LogPagination::bounds($offset, $limit);
+        if (!$bounds || $gmId < 0) return [];
+        return $this->gmLogs($logType, $gmId)->orderBy('time', 'DESC')->orderBy('id', 'DESC')
+            ->limit($bounds[1], $bounds[0])->get()->getResultArray();
+    }
+
+    public function countGMLogsDb(string $type = '', int $gmId = 0): int
+    {
+        return $gmId >= 0 ? $this->gmLogs($type, $gmId)->countAllResults() : 0;
     }
 
     public function createGMLogDb($action, $gm_id, $affected, $ip, $type, $realmId): void

@@ -112,7 +112,7 @@ var Router = {
 					}
 
 					// Admin plugins must be available before inline page scripts execute.
-					if (data.admin_assets) { window.location.assign(link); return; }
+					if (data.admin_assets || data.public_assets) { window.location.assign(link); return; }
 
 					// Change the cursor back to normal
 					$("html").css("cursor", "default");

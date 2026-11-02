@@ -12,7 +12,7 @@ module.exports = defineConfig({
     workers: 1,
     retries: 0,
     timeout: 60000,
-    globalTimeout: 900000,
+    globalTimeout: 1200000,
     expect: {timeout: 10000},
     outputDir: path.join(output, 'results'),
     reporter: [['list'], ['html', {outputFolder: path.join(output, 'report'), open: 'never'}]],

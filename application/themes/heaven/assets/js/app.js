@@ -57,6 +57,7 @@ let App = (function()
      */
     self.owlCarousel = function()
     {
+        if (typeof $.fn.owlCarousel !== 'function') return;
         $('[owl-carousel="main"]').owlCarousel({
             nav: false,
             loop: true,

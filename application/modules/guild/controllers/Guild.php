@@ -2,107 +2,47 @@
 
 use MX\MX_Controller;
 
-/**
- * Guild Controller Class
- * @property guild_model $guild_model guild_model Class
- */
 class Guild extends MX_Controller
 {
-    private $realm;
-    private $guild;
-    private $members;
-    private $guildLeader;
-
     public function __construct()
     {
         parent::__construct();
-
         $this->load->model('guild_model');
     }
 
     public function index($realm = false, $id = false)
     {
-        // Make sure item and realm are set
-        if (!$id || !$realm) {
-            die(lang('invalid', 'guild'));
+        $realm = filter_var($realm, FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]);
+        $id = filter_var($id, FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]);
+        $bounds = PageBounds::bounds($this->input->get('offset') ?? 0, 25);
+        if (!$realm || !$id || !$bounds || !$this->realms->realmExists($realm)) { http_response_code(400); die(lang('invalid', 'guild')); }
+        $key = 'guild_v2_' . $realm . '_' . $id . '_' . $bounds[0] . '_' . getLang();
+        $cached = $this->cache->get($key);
+        if (is_array($cached) && isset($cached['page'], $cached['title'])) {
+            $this->template->setTitle($cached['title']);
+            $this->template->view($cached['page'], 'modules/guild/css/guild.css'); return;
         }
-
-        $cache = $this->cache->get('guild_' . $realm . '_' . $id . "_" . getLang());
-
-        if ($cache !== false) {
-            $page = $cache;
-        } else {
-            $this->realm = $realm;
-            $this->loadGuild($realm, $id);
-
-            if (!$this->guild) {
-                $this->template->setTitle(lang('invalid_guild', 'guild'));
-            } else {
-                $this->template->setTitle($this->guild['guildName']);
-            }
-
-            $guild_data = [
-                'module' => 'guild',
-                'guild' => $this->guild,
-                'members' => $this->members,
-                'leader' => $this->guildLeader,
-                'realmId' => $realm,
-                'realmName' => $this->realms->getRealm($realm)->getName(),
-                'url' => $this->template->page_url
-            ];
-            if ($this->guild) {
-                $guild_data['guildMotd'] = $this->template->format($this->guild['motd']);
-            }
-
-            $content = $this->template->loadPage('guild.tpl', $guild_data);
-
-            $data = [
-                'module' => "default",
-                'headline' => breadcrumb([
-                    'armory' => lang('armory', 'guild'),
-                    uri_string() => ((!$this->guild) ? lang("invalid_guild", "guild") : $this->guild['guildName'])
-                ]),
-                'content' => $content
-            ];
-
-            $page = $this->template->loadPage("page.tpl", $data);
-
-            $this->cache->save('guild_' . $realm . '_' . $id . "_" . getLang(), $page, 60 * 60);
+        $guild = $this->guild_model->getGuild($realm, $id);
+        $title = $guild ? $guild['guildName'] : lang('invalid_guild', 'guild');
+        $this->template->setTitle($title);
+        $total = $guild ? $this->guild_model->countGuildMembers($realm, $id) : 0;
+        $offset = PageBounds::clamp($bounds[0], $total, 25);
+        $members = $guild ? $this->guild_model->getGuildMembers($realm, $id, $offset, 25) : [];
+        foreach ($members as &$member) {
+            $member['classId'] = $member['class']; $member['raceId'] = $member['race'];
+            $member['faction'] = $this->realms->getFactionByRaceId((int) $member['race']);
         }
-
+        unset($member);
+        $base = $this->template->page_url . 'guild/' . $realm . '/' . $id;
+        $data = ['module' => 'guild', 'guild' => $guild, 'members' => $members, 'member_count' => $total,
+            'realmId' => $realm, 'realmName' => $this->realms->getRealm($realm)->getName(), 'url' => $this->template->page_url,
+            'guildMotd' => $guild ? $this->template->format($guild['motd']) : '',
+            'previous' => $offset > 0 ? $base . '?offset=' . max(0, $offset - 25) : '',
+            'next' => $offset + count($members) < $total ? $base . '?offset=' . ($offset + 25) : ''];
+        $page = $this->template->loadPage('page.tpl', ['module' => 'default', 'headline' => breadcrumb(['armory' => lang('armory', 'guild'), uri_string() => $title]),
+            'content' => $this->template->loadPage('guild.tpl', $data)]);
+        // Only valid page offsets get cache entries; arbitrary oversized offsets cannot fill the cache.
+        if ($offset === $bounds[0]) $this->cache->save($key, ['page' => $page, 'title' => $title], 300);
         $this->template->view($page, 'modules/guild/css/guild.css');
-    }
-
-    public function loadGuild($realm, $id)
-    {
-        $this->guild = $this->guild_model->getGuild($realm, $id);
-        if (!empty($this->guild['leaderguid']) && $this->realms->getRealm($realm)->getCharacters()->characterExists($this->guild['leaderguid']))
-        {
-            $this->guildLeader = $this->guild_model->loadMember($realm, $this->guild['leaderguid']);
-        }
-
-        $this->members = $this->guild_model->getGuildMembers($realm, $id);
-
-        if ($this->guild)
-        {
-            if ($this->realms->getRealm($realm)->getCharacters()->characterExists($this->guild['leaderguid']))
-            {
-                $this->guildLeader['classId'] = $this->guildLeader['class'];
-                $this->guildLeader['raceId'] = $this->guildLeader['race'];
-                $this->guildLeader['gender'] = $this->guildLeader['gender'];
-                $this->guildLeader['faction'] = $this->realms->getRealm($realm)->getCharacters()->getFaction($this->guild['leaderguid']);
-            }
-
-            if ($this->members)
-            {
-                foreach ($this->members as $key => $value)
-                {
-                    $this->members[$key]['classId'] = $this->members[$key]['class'];
-                    $this->members[$key]['raceId'] = $this->members[$key]['race'];
-                    $this->members[$key]['gender'] = $this->members[$key]['gender'];
-                    $this->members[$key]['faction'] = $this->realms->getRealm($realm)->getCharacters()->getFaction($this->members[$key]['guid']);
-                }
-            }
-        }
     }
 }
