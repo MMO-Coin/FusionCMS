@@ -8,119 +8,52 @@ use MX\MX_Controller;
  */
 class Logging extends MX_Controller
 {
-    private $logsToLoad = 10; // 10 at the time
+    private int $logsToLoad = 10;
 
     public function __construct()
     {
         parent::__construct();
-
-        $this->load->library("administrator");
+        $this->load->library('administrator');
         $this->load->model('logging_model');
-
-        requirePermission("viewLogs");
+        requirePermission('viewLogs');
     }
 
-    /**
-     * Loads the page
-     */
+    private function formatLogs(array $logs): array
+    {
+        foreach ($logs as &$log) $log['custom'] = json_decode($log['custom']);
+        return $logs;
+    }
+
     public function index()
     {
-        //Set the title to menu
         $this->administrator->setTitle(lang('admin_logs', 'admin'));
-
-        $logs = $this->dblogger->getLogs("", 0, 10);
-
-        if ($logs)
-        {
-            foreach ($logs as $key => $value) {
-                $logs[$key]['custom'] = json_decode($value['custom']);
-            }
-        }
-
-        // Prepare my data
-        $data = array(
-            'logs' => $logs, // Get the logs from 0 till 10
+        $logs = $this->logging_model->findLogs('', '', 0, $this->logsToLoad);
+        $data = [
+            'logs' => $this->formatLogs($logs),
             'modules' => $this->administrator->getEnabledModules(),
-            'show_more' => $this->dblogger->getLogCount() - count((array)$logs)
-        );
-
-        // Load my view
-        $output = $this->template->loadPage("logging/logging.tpl", $data);
-
-        // Put my view in the main box with a headline
-        $content = $this->administrator->box(lang('admin_website_logs', 'admin'), $output);
-
-        // Output my content. The method accepts the same arguments as template->view
-        $this->administrator->view($content, false, "modules/admin/js/logging.js");
+            'show_more' => max(0, $this->logging_model->countLogs() - count($logs)),
+        ];
+        $output = $this->template->loadPage('logging/logging.tpl', $data);
+        $this->administrator->view($this->administrator->box(lang('admin_website_logs', 'admin'), $output), false, 'modules/admin/js/logging.js');
     }
 
     public function loadMoreLogs()
     {
-        $offset = $this->input->post('offset');
-        $count = $this->input->post('count');
-        $extraLogCount = $this->input->post('show_more');
-
-        $extraLogCount -= $this->logsToLoad;
-
-        // Validation, checking is done in the model.
-        $logs = $this->dblogger->getLogs("", $offset, $count);
-
-        if ($logs)
-        {
-            foreach ($logs as $key => $value) {
-                $logs[$key]['custom'] = json_decode($value['custom']);
-            }
-        }
-
-        if ($logs) {
-            // Prepare my data
-            $data = array(
-                'logs' => $logs,
-                'show_more' => $extraLogCount
-            );
-
-            // Load my view
-            $output = $this->template->loadPage("logging/logging_found.tpl", $data);
-
-            die($output);
-        } else {
-            die("<span>No results</span>");
-        }
+        $this->search();
     }
 
-    /**
-     * Applies search for the given parameters.
-     * POST: module the module name
-     * POST: search the on search text, username,ip,userid
-     */
     public function search()
     {
         $module = $this->input->post('module');
         $search = $this->input->post('search');
-
-        // Validation, checking is done in the model.
-        $logs = $this->logging_model->findLogs($search, $module);
-
-        if ($logs)
-        {
-            foreach ($logs as $key => $value) {
-                $logs[$key]['custom'] = json_decode($logs[$key]['custom']);
-            }
-        }
-
-        if ($logs) {
-            // Prepare my data
-            $data = array(
-                'logs' => $logs,
-                'show_more' => ''
-            );
-
-            // Load my view
-            $output = $this->template->loadPage("logging/logging_found.tpl", $data);
-
-            die($output);
-        } else {
-            die("<span>No results</span>");
-        }
+        $module = is_string($module) ? mb_substr($module, 0, 255) : '';
+        $search = is_string($search) ? mb_substr(trim($search), 0, 255) : '';
+        $offset = $this->input->post('offset') ?? 0;
+        $logs = $this->logging_model->findLogs($search, $module, $offset, $this->logsToLoad);
+        if (!$logs) die('<span>' . lang('no_results', 'admin') . '</span>');
+        die($this->template->loadPage('logging/logging_found.tpl', [
+            'logs' => $this->formatLogs($logs),
+            'show_more' => max(0, $this->logging_model->countLogs($search, $module) - (int) $offset - count($logs)),
+        ]));
     }
 }

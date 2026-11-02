@@ -1,4 +1,16 @@
 .cursor-pointer {cursor:pointer;}
+.auth-login .form-label {
+    color: var(--auth-control-color, #f8f9fa);
+    margin-bottom: 0.4rem;
+}
+.auth-login button.input-group-text {
+    opacity: 1;
+    color: var(--auth-control-color, #f8f9fa);
+}
+.auth-login button:focus-visible {
+    outline: 3px solid var(--auth-control-color, #f8f9fa);
+    outline-offset: 3px;
+}
 .rounded-bottom-start {border-bottom-left-radius: 0.25rem!important;}
 .rounded-bottom-end {border-bottom-right-radius: 0.25rem!important;}
 

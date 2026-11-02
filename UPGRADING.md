@@ -4,6 +4,12 @@ This guide covers the `9.5.2` release of [MMO-Coin/FusionCMS](https://github.com
 
 ## Before you upgrade
 
+For the log pagination changes on `main`, apply `application/modules/install/SQL/updates/2026_11_02_02_log_query_indexes.sql` to the **website database**. It adds indexes for account log ordering, website log ordering and article comments. The script can be rerun and reuses equivalent custom indexes. It does not change existing rows or the game databases. Fresh installations include these indexes. On large tables, schedule index creation during a maintenance window because it can take time and may block writes depending on the database version.
+
+Email logs now show 25 records per page, newest ID first, with search handled by the server. Account and website log pages use timestamp and ID ordering, and requests cannot select more than 100 records at once. Clear compiled templates after deploying the login labels and keyboard password toggle.
+
+The bundled English, French, Persian, Portuguese and Spanish language files include the new login and log navigation labels. Merge those new keys from the English files into any custom language packs you maintain.
+
 1. Test the upgrade on a separate copy of your site and website database. Pause donations and other writes while upgrading the actual site.
 2. Back up the website database and the current site files together. Keep your database configuration, `application/config/fusion.php`, `application/config/owner.php`, donation settings, custom themes and uploaded files. Store backups outside the public web directory.
 3. Install PHP 8.3.36+, 8.4.27+ or 8.5.12+ within those branches, with the extensions listed in the README. Check the PHP runtime used by the website as well as the command line. On Windows, use the updated `-1` packages or newer builds for the Brotli fix.

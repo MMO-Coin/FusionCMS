@@ -20,7 +20,7 @@
 	</div>
 	</form>
 
-	<span id="log_list">
+	<div id="log_list" data-load-error="{lang('logs_load_error', 'admin')|escape}">
         {if $logs}
 		<table class="table table-hover mb-0">
 			<thead>
@@ -79,6 +79,6 @@
                 <input type="hidden" id="js_load_more" value="{$show_more}"/>
             </span>
         {/if}
-	</span>
+	</div>
 	</div>
 </div>

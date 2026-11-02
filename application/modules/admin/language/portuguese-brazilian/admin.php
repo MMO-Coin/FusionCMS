@@ -496,3 +496,10 @@ $lang = [
     'oh_no' => 'Oh não!',
     'realm_has_soap_problem' => 'Parece que um reino está com problema de SOAP!',
 ];
+$lang['logs_load_error'] = 'Não foi possível carregar os registros. Tente novamente.';
+$lang['email_log_search'] = 'Buscar e-mail, assunto ou ID de usuário';
+$lang['email_log_pages'] = 'Páginas do registro de e-mails';
+$lang['log_previous'] = 'Anterior';
+$lang['log_next'] = 'Próxima';
+$lang['log_page_status'] = 'Página {0} de {1} ({2} registros)';
+$lang['no_results'] = 'Nenhum resultado';

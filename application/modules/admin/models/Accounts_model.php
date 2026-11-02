@@ -3,6 +3,8 @@
 use CodeIgniter\Database\BaseConnection;
 use MX\CI;
 
+require_once dirname(__DIR__, 3) . '/libraries/LogPagination.php';
+
 class Accounts_model extends CI_Model
 {
     private BaseConnection $connection;
@@ -190,21 +192,16 @@ class Accounts_model extends CI_Model
         $this->dblogger->createLog("admin", "edit", "Edited account " . $this->user->getUsername($id) . " (" . $id . ")", $changed_values);
     }
 
-    public function getLogs($id, $offset = 0, $limit = 0)
+    public function getLogs($id, $offset = 0, $limit = LogPagination::DEFAULT_SIZE)
     {
-        if (!is_numeric($id) || !is_numeric($limit) || !is_numeric($offset)) {
-            return null;
-        }
+        $bounds = LogPagination::bounds($offset, $limit);
+        $id = filter_var($id, FILTER_VALIDATE_INT, ['options' => ['min_range' => 0]]);
+        if (!$bounds || $id === false) return [];
 
         $builder = $this->db->table('logs')->select();
         $builder->where('user_id', $id);
-        $builder->orderBy('time', 'DESC');
-        if ($limit > 0 && $offset == 0) {
-            $builder->limit($limit);
-        }
-        if ($limit > 0 && $offset > 0) {
-            $builder->limit(($offset + $limit), $offset);
-        }
+        $builder->orderBy('time', 'DESC')->orderBy('id', 'DESC');
+        $builder->limit($bounds[1], $bounds[0]);
         $query = $builder->get();
 
         if ($query->getNumRows() > 0) {

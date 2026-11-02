@@ -52,7 +52,7 @@
 				</li>
 			</ul>
 			<div class="tab-content border-muted-200 dark:border-muted-700 dark:bg-muted-800 relative w-full border bg-white transition-all duration-300 rounded-xl p-6">
-				<div id="overview" class="tab-pane active">
+				<div id="overview" data-load-error="{lang('logs_load_error', 'admin')|escape}" class="tab-pane active">
 					<h4 class="mb-3 font-weight-semibold text-dark">{lang('timeline', 'admin')}</h4>
 
 					<div class="timeline timeline-simple">
@@ -69,7 +69,7 @@
 							</ol>
 						{/foreach}
 						</div>
-						<div id="show_more_count">
+						<div id="show_more_count" {if $show_more <= 0}style="display:none;"{/if}>
 							<div class="timeline-item" >
 								<input type="hidden" id="js_load_more" value="{$show_more}">
 							</h3>

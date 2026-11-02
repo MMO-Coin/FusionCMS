@@ -67,6 +67,12 @@ jobs:
     - name: Run PHP requirement regression tests
       run: php tests/php_requirements_test.php
 
+    - name: Run log pagination, migration and query plan checks
+      env:
+        FUSION_TEST_MYSQL_HOST: 127.0.0.1
+        FUSION_TEST_MYSQL_PASSWORD: fusion_test
+      run: php tests/log_pagination_test.php
+
     - name: Run HTTP response regression tests
       run: php tests/http_response_test.php
 

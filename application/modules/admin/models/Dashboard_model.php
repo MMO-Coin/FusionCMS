@@ -1,5 +1,7 @@
 <?php
 
+require_once dirname(__DIR__, 3) . '/libraries/LogPagination.php';
+
 class Dashboard_model extends CI_Model
 {
     public function getUnique($type)
@@ -204,14 +206,31 @@ class Dashboard_model extends CI_Model
         throw new Exception("Could not disable module with id: " . $moduleId);
     }
 
-    public function getEmailLogs()
+    private function emailLogsQuery(string $search)
     {
-        $query = $this->db->query("SELECT * FROM email_log ORDER BY timestamp DESC");
-
-        if ($query->getNumRows()) {
-            return $query->getResultArray();
-        } else {
-            return false;
+        $builder = $this->db->table('email_log');
+        if ($search !== '') {
+            // Escape LIKE metacharacters; the query builder binds quotes separately.
+            $escape = $this->db->likeEscapeChar;
+            $term = strtr($search, [$escape => $escape . $escape, '%' => $escape . '%', '_' => $escape . '_']);
+            $builder->groupStart()->like('email', $term, 'both', true)->orLike('subject', $term, 'both', true);
+            if (ctype_digit($search)) $builder->orWhere('uid', $search);
+            $builder->groupEnd();
         }
+        return $builder;
+    }
+
+    public function countEmailLogs(string $search = ''): int
+    {
+        return $this->emailLogsQuery($search)->countAllResults();
+    }
+
+    public function getEmailLogs($offset = 0, $limit = LogPagination::DEFAULT_SIZE, string $search = ''): array
+    {
+        $bounds = LogPagination::bounds($offset, $limit);
+        if (!$bounds) return [];
+        // IDs are monotonic; the legacy timestamp column is a varchar, not a sortable date type.
+        return $this->emailLogsQuery($search)->orderBy('id', 'DESC')->limit($bounds[1], $bounds[0])
+            ->get()->getResultArray();
     }
 }

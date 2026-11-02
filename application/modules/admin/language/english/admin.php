@@ -500,3 +500,10 @@ $lang = [
     'oh_no' => 'Oh no!',
     'realm_has_soap_problem' => 'Looks like a realm has a soap problem!',
 ];
+$lang['logs_load_error'] = 'Unable to load logs. Please try again.';
+$lang['email_log_search'] = 'Search email, subject or user ID';
+$lang['email_log_pages'] = 'Email log pages';
+$lang['log_previous'] = 'Previous';
+$lang['log_next'] = 'Next';
+$lang['log_page_status'] = 'Page {0} of {1} ({2} records)';
+$lang['no_results'] = 'No results';

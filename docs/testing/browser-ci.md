@@ -74,6 +74,10 @@ The defaults are `127.0.0.1:3306`, database user `root`, test password `fusion_t
 
 The disposable PHP server disables OPcache so configuration edits made by fixtures take effect on the next request. This matters when tests switch between binary, Base32 and encrypted authenticator storage. Production PHP settings are unchanged.
 
+The admin log browser checks use the normal owner login and admin security code. They cover filtered load-more pages, account log limits, server-side email pagination and escaped message details on desktop and mobile. Login checks also verify visible labels, password-manager autocomplete hints and the keyboard password toggle.
+
+`php tests/log_pagination_test.php` checks page boundaries, tied timestamps, input bounds and filtered counts with SQLite. With the MySQL test variables above, it creates a randomly named schema on the disposable loopback server, seeds 12,000 logs and 12,000 comments, and compares `EXPLAIN` plans before and after the index migration. It checks actual index selection, migration reruns and equivalent custom indexes, then removes only its guarded schema. These plans measure access paths and sorting, not production response times.
+
 Each run creates uniquely named `fusion_e2e_<random>_cms` and `fusion_e2e_<random>_auth` databases. Existing databases are never imported into. Resets and cleanup check an owner token before modifying fixture data. Only tracked working-tree runtime files are copied into a temporary site; local database, owner and fusion configuration is generated separately. CAPTCHA is disabled only in that copy, and CSRF protection stays enabled.
 
 The local RPC endpoint uses a newly generated localhost certificate. PHP trusts that certificate for this process, with HTTPS certificate and hostname verification enabled. No wallet keys or public network connection are needed. Browser requests to external origins are blocked.

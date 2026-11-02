@@ -496,3 +496,10 @@ $lang = [
     'oh_no' => 'اوه نه!',
     'realm_has_soap_problem' => 'به نظر می‌رسد یکی از ریلم‌ها مشکل SOAP دارد!',
 ];
+$lang['logs_load_error'] = 'بارگذاری گزارش‌ها ممکن نشد. دوباره تلاش کنید.';
+$lang['email_log_search'] = 'جستجوی ایمیل، موضوع یا شناسه کاربر';
+$lang['email_log_pages'] = 'صفحه‌های گزارش ایمیل';
+$lang['log_previous'] = 'قبلی';
+$lang['log_next'] = 'بعدی';
+$lang['log_page_status'] = 'صفحه {0} از {1} ({2} رکورد)';
+$lang['no_results'] = 'نتیجه‌ای یافت نشد';

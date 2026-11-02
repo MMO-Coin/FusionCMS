@@ -17,3 +17,5 @@ $lang["minutes"] = "دقیقه.";
 
 //Captcha
 $lang["captcha_invalid"] = "کپچا نامعتبر است";
+$lang['login_show_password'] = 'نمایش گذرواژه';
+$lang['login_refresh_captcha'] = 'تازه‌سازی کد امنیتی';

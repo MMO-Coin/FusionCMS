@@ -77,17 +77,17 @@ var Auth = {
 
 	showPassword: function(ele) {
 		if($(ele).data("show") == true) {
-			$(ele).html('<i class="fa-duotone fa-eye-slash"></i>');
+			$(ele).html('<i class="fa-duotone fa-eye-slash" aria-hidden="true"></i>');
 			$(ele).data("show", false);
 
 			$("input#"+ $(ele).data("input-id")).attr("type", "password");
 		} else if($(ele).data("show") == false) {
-			$(ele).html('<i class="fa-duotone fa-eye"></i>');
+			$(ele).html('<i class="fa-duotone fa-eye" aria-hidden="true"></i>');
 			$(ele).data("show", true);
 			
 			$("input#"+ $(ele).data("input-id")).attr("type", "text");
 		}
-		
+		if ($(ele).is('[aria-pressed]')) $(ele).attr('aria-pressed', String($(ele).data('show')));
 	},
 
 	refreshCaptcha: function(ele) {

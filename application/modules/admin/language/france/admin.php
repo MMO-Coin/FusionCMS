@@ -496,3 +496,10 @@ $lang = [
     'oh_no' => 'Oh non !',
     'realm_has_soap_problem' => 'Il semble qu\'un royaume ait un problème de soap !',
 ];
+$lang['logs_load_error'] = 'Impossible de charger les journaux. Réessayez.';
+$lang['email_log_search'] = 'Rechercher un e-mail, un objet ou un identifiant utilisateur';
+$lang['email_log_pages'] = 'Pages du journal des e-mails';
+$lang['log_previous'] = 'Précédent';
+$lang['log_next'] = 'Suivant';
+$lang['log_page_status'] = 'Page {0} sur {1} ({2} entrées)';
+$lang['no_results'] = 'Aucun résultat';

@@ -1,34 +1,36 @@
 <div class="page-subbody mt-0">
 <div class="col-12 col-xxl-6 col-xl-6 col-lg-6 col-md-12 col-sm-12 mx-auto">
-    <form onSubmit="Auth.login(true); return false;">
+    <form class="auth-login" onSubmit="Auth.login(true); return false;">
         <div class="card-body">
             </br>
             <div class="alert alert-danger text-center error-feedback d-none" role="alert"></div>
             </br>
 
             <div class="input-group p-0 flex-row">
-                <label for="floatingUser" class="input-group-text" id="username" style="width:45px;"><i class="fa-duotone fa-user"></i></label>
-                <input type="text" class="form-control username-input border-0" id="floatingUser" placeholder="{lang('login_label_user', 'auth')}" aria-describedby="username">
+                <label for="floatingUser" class="form-label w-100">{lang('login_label_user', 'auth')}</label>
+                <span class="input-group-text" style="width:45px;" aria-hidden="true"><i class="fa-duotone fa-user"></i></span>
+                <input type="text" class="form-control username-input border-0" id="floatingUser" name="username" autocomplete="username" autocapitalize="none" spellcheck="false" placeholder="{lang('login_label_user', 'auth')}" required>
             </div>
 
             <div class="input-group p-0 mt-3 flex-row">
-                <label class="input-group-text cursor-pointer" id="password" style="width:45px;" data-input-id="floatingPassword" data-show="false" onClick="Auth.showPassword(this);"><i class="fa-duotone fa-eye-slash"></i></label>
-                <input type="password" class="form-control password-input border-0" id="floatingPassword" placeholder="{lang('login_label_password', 'auth')}" aria-describedby="password">
+                <label for="floatingPassword" class="form-label w-100">{lang('login_label_password', 'auth')}</label>
+                <button type="button" class="btn btn-outline-secondary input-group-text" style="min-width:44px;min-height:44px;" aria-label="{lang('login_show_password', 'auth')|escape}" aria-controls="floatingPassword" aria-pressed="false" data-input-id="floatingPassword" data-show="false" onClick="Auth.showPassword(this);"><i class="fa-duotone fa-eye-slash" aria-hidden="true"></i></button>
+                <input type="password" class="form-control password-input border-0" id="floatingPassword" name="password" autocomplete="current-password" placeholder="{lang('login_label_password', 'auth')}" required>
             </div>
 
             <div class="captcha-field {if !$use_captcha}d-none{/if}">
                 <div class="input-group mt-3">
                     {if $captcha_type == 'image_captcha'}
-                        <label for="floatingCaptcha" class="input-group-text w-100 rounded-0 rounded-top text-center d-block" id="captcha">
+                        <label for="floatingCaptcha" class="input-group-text w-100 rounded-0 rounded-top text-center d-block" id="captcha-label">
                             <img src="{$url}auth/getCaptcha?{time()}" alt="captcha" width="150" height="30" id="captchaImage">
                         </label>
 
-                        <span class="input-group-text cursor-pointer ms-0 rounded-0 rounded-bottom-start" id="captcha" style="width:40px;" data-captcha-id="captchaImage" onClick="Auth.refreshCaptcha(this);">
-                            <i class="fa-duotone fa-rotate"></i>
-                        </span>
+                        <button type="button" class="btn btn-outline-secondary input-group-text ms-0 rounded-0 rounded-bottom-start" style="min-width:44px;min-height:44px;" aria-label="{lang('login_refresh_captcha', 'auth')|escape}" data-captcha-id="captchaImage" onClick="Auth.refreshCaptcha(this);">
+                            <i class="fa-duotone fa-rotate" aria-hidden="true"></i>
+                        </button>
 
                         <div class="form-floating ms-0 flex-grow-1">
-                            <input type="text" class="form-control captcha-input border-0 rounded-0 rounded-bottom-end" id="floatingCaptcha" placeholder="{lang('login_label_captcha', 'auth')}" aria-describedby="captcha">
+                            <input type="text" class="form-control captcha-input border-0 rounded-0 rounded-bottom-end" id="floatingCaptcha" placeholder="{lang('login_label_captcha', 'auth')}">
                             <label for="floatingCaptcha">{lang("login_label_captcha", "auth")}</label>
                         </div>
                     {elseif $captcha_type == 'recaptcha' || $captcha_type == 'recaptcha3'}

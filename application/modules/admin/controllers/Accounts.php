@@ -96,7 +96,7 @@ class Accounts extends MX_Controller
                 'register_date' => preg_replace("/\s.*/", "", $this->external_account_model->getJoinDate()),
                 'modules' => $this->getModulePermissions(),
                 'logs' => $logs,
-                'show_more' => $this->dblogger->getLogCount() - count(array($logs))
+                'show_more' => max(0, $this->logging_model->countUserLogs($id) - count((array) $logs))
             );
 
             // Load my view
@@ -178,10 +178,7 @@ class Accounts extends MX_Controller
     public function loadMoreLogs($id)
     {
         $offset = $this->input->post('offset');
-        $count = $this->input->post('count');
-        $extraLogCount = $this->input->post('show_more');
-
-        $extraLogCount -= $this->logsToLoad;
+        $count = $this->logsToLoad;
 
         // Validation, checking is done in the model.
         $logs = $this->logging_model->getLogs($id, $offset, $count);
@@ -191,7 +188,7 @@ class Accounts extends MX_Controller
             $data = array(
                 'logs' => $logs,
                 'userid' => $id,
-                'show_more' => $extraLogCount
+                'show_more' => max(0, $this->logging_model->countUserLogs($id) - (int) $offset - count($logs))
             );
 
             // Load my view

@@ -2,6 +2,7 @@ var Accounts = {
 	offset: 0,
 	loadMoreCount: 10,
     logCount: 0,
+    loadingLogs: false,
 
 	/**
 	 * Links for the ajax requests
@@ -60,16 +61,19 @@ var Accounts = {
 	loadMore: function(id)
 	{
 
-		this.offset += this.loadMoreCount;
-        this.logCount = $('#js_load_more').val();
-
-        $("#show_more_count").remove();
-
-		$.post(Config.URL + this.Links.loadMore + id, {offset: this.offset, count: this.loadMoreCount, show_more: this.logCount, csrf_token_name: Config.CSRF}, function(data)
-		{
-			$("#overview").append(data);
-		});
-		$("#show_more_count").append();
+        if (this.loadingLogs || Number($('#js_load_more').val()) <= 0) return;
+        this.loadingLogs = true;
+        var nextOffset = this.offset + this.loadMoreCount;
+        $.post(Config.URL + this.Links.loadMore + id, {offset: nextOffset, csrf_token_name: Config.CSRF})
+            .done(function(data) {
+                Accounts.offset = nextOffset;
+                $('#show_more_count').remove();
+                $('#overview .log-load-error').remove();
+                $('#overview').append(data);
+            }).fail(function() {
+                $('#overview .log-load-error').remove();
+                $('<p class="log-load-error text-danger" role="alert">').text($('#overview').data('load-error')).appendTo('#overview');
+            }).always(function() { Accounts.loadingLogs = false; });
 	},
 	
 	removePendingAcc: function(id, element)

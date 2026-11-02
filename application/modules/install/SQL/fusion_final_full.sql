@@ -584,7 +584,8 @@ CREATE TABLE `comments`  (
   `timestamp` int(11) NULL DEFAULT NULL,
   `content` varchar(255) CHARACTER SET utf8 COLLATE utf8_unicode_ci NOT NULL,
   `is_gm` int(1) NOT NULL DEFAULT 0,
-  PRIMARY KEY (`id`) USING BTREE
+  PRIMARY KEY (`id`) USING BTREE,
+  INDEX `idx_comments_article_id` (`article_id`, `id`) USING BTREE
 ) ENGINE=InnoDB AUTO_INCREMENT=1 DEFAULT CHARSET=utf8 COLLATE=utf8_unicode_ci ROW_FORMAT=Dynamic;
 
 -- ----------------------------
@@ -702,7 +703,9 @@ CREATE TABLE `logs`  (
   `ip` varchar(255) CHARACTER SET utf8 COLLATE utf8_unicode_ci NOT NULL,
   `time` int(11) NOT NULL,
   PRIMARY KEY (`id`) USING BTREE,
-  INDEX `user_id`(`user_id`) USING BTREE
+  INDEX `user_id`(`user_id`) USING BTREE,
+  INDEX `idx_logs_user_time_id` (`user_id`, `time`, `id`) USING BTREE,
+  INDEX `idx_logs_time_id` (`time`, `id`) USING BTREE
 ) ENGINE=InnoDB AUTO_INCREMENT=1 DEFAULT CHARSET=utf8 COLLATE=utf8_unicode_ci ROW_FORMAT=Dynamic;
 
 -- ----------------------------

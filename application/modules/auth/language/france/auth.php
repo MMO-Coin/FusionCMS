@@ -17,4 +17,5 @@ $lang["minutes"] = "minutes.";
 
 //Captcha
 $lang["captcha_invalid"] = "Captcha invalide";
-
+$lang['login_show_password'] = 'Afficher le mot de passe';
+$lang['login_refresh_captcha'] = 'Actualiser le captcha';

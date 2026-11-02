@@ -224,6 +224,29 @@ if ($action === 'cleanup') {
     $db->select_db($config['cms']);
     $row['claims'] = $db->query('SELECT * FROM account_totp_uses ORDER BY account_id, secret_hash')->fetch_all(MYSQLI_ASSOC);
     echo json_encode($row, JSON_THROW_ON_ERROR);
+} elseif ($action === 'seed-admin-logs') {
+    $db->select_db($config['cms']);
+    $db->query('DELETE FROM logs');
+    $db->query('DELETE FROM email_log');
+    $log = $db->prepare('INSERT INTO logs (id, module, user_id, type, event, message, status, custom, ip, time) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)');
+    for ($id = 1; $id <= 85; $id++) {
+        $user = $id <= 65 ? 1 : 2;
+        $module = $id % 2 ? 'auth' : 'admin';
+        $type = 'user'; $event = 'login'; $message = 'Optimization log ' . $id;
+        $status = 'succeed'; $custom = '{}'; $ip = '192.0.2.' . $user; $time = 1793500000;
+        $log->bind_param('isissssssi', $id, $module, $user, $type, $event, $message, $status, $custom, $ip, $time);
+        $log->execute();
+    }
+    $email = $db->prepare('INSERT INTO email_log (id, uid, email, subject, message, timestamp) VALUES (?, 1, ?, ?, ?, ?)');
+    for ($id = 1; $id <= 65; $id++) {
+        $recipient = 'e2eplayer@example.invalid';
+        $subject = ($id % 2 ? 'Target' : 'Other') . ' email ' . $id;
+        $message = '<script>window.__unsafeEmail = 1</script> Message ' . $id;
+        $time = '1793500000';
+        $email->bind_param('issss', $id, $recipient, $subject, $message, $time);
+        $email->execute();
+    }
+    echo 'Seeded bounded admin log fixtures.';
 } elseif ($action === 'snapshot') {
     $db->select_db($config['cms']);
     echo json_encode([

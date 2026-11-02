@@ -1,5 +1,7 @@
 <?php
 
+require_once dirname(__DIR__, 3) . '/libraries/LogPagination.php';
+
 /**
  * @package FusionCMS
  * @version 6.X
@@ -9,61 +11,45 @@
  */
 class Logging_model extends CI_Model
 {
-    /**
-     * Find logs by the given parameters
-     *
-     * @param  $search
-     * @param  $module
-     * @return bool
-     */
-    public function findLogs($search = "", $module = "")
+    private function filteredLogs(string $search, string $module)
     {
-        if (!empty($search)) {
-            if (!is_numeric($search)) {
-                $userId = $this->user->getId($search);
-            } else {
-                $userId = $search;
-            }
+        $builder = $this->db->table('logs');
+        if ($module !== '') $builder->where('module', $module);
+        if ($search !== '') {
+            $userId = ctype_digit($search) ? filter_var($search, FILTER_VALIDATE_INT) :
+                (filter_var($search, FILTER_VALIDATE_IP) ? false : $this->user->getId($search));
+            $builder->groupStart()->where('ip', $search);
+            if ($userId !== false && ($userId > 0 || $search === '0')) $builder->orWhere('user_id', $userId);
+            $builder->groupEnd();
         }
-
-        // prevent sql injection
-        $module = $this->db->escapeString($module);
-
-        if ($search) {
-            $query = $this->db->query("SELECT * FROM `logs` WHERE " . (($module) ? "`module` = '" . $module . "' AND " : "") . " (`user_id` = ? OR `ip` = ?)", array($userId, $search));
-        } else {
-            $query = $this->db->query("SELECT * FROM `logs` " . (($module) ? "WHERE `module` = '" . $module . "'" : ""));
-        }
-
-
-        if ($query->getNumRows() > 0) {
-            return $query->getResultArray();
-        } else {
-            return false;
-        }
+        return $builder;
     }
 
-    public function getLogs($id = false, $offset = 0, $limit = 0)
+    public function findLogs($search = '', $module = '', $offset = 0, $limit = LogPagination::DEFAULT_SIZE): array
     {
-        if (!is_numeric($id) || !is_numeric($limit) || !is_numeric($offset)) {
-            return null;
-        }
+        $bounds = LogPagination::bounds($offset, $limit);
+        if (!$bounds || !is_string($search) || !is_string($module)) return [];
+        return $this->filteredLogs($search, $module)->orderBy('time', 'DESC')->orderBy('id', 'DESC')
+            ->limit($bounds[1], $bounds[0])->get()->getResultArray();
+    }
 
-        $builder = $this->db->table('logs')->select();
-        $builder->where('user_id', $id);
-        $builder->orderBy('time', 'DESC');
-        if ($limit > 0 && $offset == 0) {
-            $builder->limit($limit);
-        }
-        if ($limit > 0 && $offset > 0) {
-            $builder->limit(($offset + $limit), $offset);
-        }
-        $query = $builder->get();
+    public function countLogs(string $search = '', string $module = ''): int
+    {
+        return $this->filteredLogs($search, $module)->countAllResults();
+    }
 
-        if ($query->getNumRows() > 0) {
-            return $query->getResultArray();
-        } else {
-            return null;
-        }
+    public function countUserLogs($id): int
+    {
+        $id = filter_var($id, FILTER_VALIDATE_INT, ['options' => ['min_range' => 0]]);
+        return $id === false ? 0 : $this->db->table('logs')->where('user_id', $id)->countAllResults();
+    }
+
+    public function getLogs($id = false, $offset = 0, $limit = LogPagination::DEFAULT_SIZE): array
+    {
+        $bounds = LogPagination::bounds($offset, $limit);
+        $id = filter_var($id, FILTER_VALIDATE_INT, ['options' => ['min_range' => 0]]);
+        if (!$bounds || $id === false) return [];
+        return $this->db->table('logs')->where('user_id', $id)->orderBy('time', 'DESC')->orderBy('id', 'DESC')
+            ->limit($bounds[1], $bounds[0])->get()->getResultArray();
     }
 }

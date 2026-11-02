@@ -1,51 +1,38 @@
 var Logging = {
-	offset: 0,
-	loadMoreCount: 10,
-    logCount: 0,
-    id: 0,
+    offset: 0,
+    loadMoreCount: 10,
+    loading: false,
+    filters: {search: '', module: ''},
 
-	search: function()
-	{
-		var module = $('#module').val();
-		var search = $('#search').val();
+    search: function() {
+        if (this.loading) return;
+        this.request(0, {search: $('#search').val(), module: $('#module').val()}, true);
+    },
 
-		$("#log_list").html('<center><i class="fa-duotone fa-spinner fa-spin fa-2x"></i></center>');
+    loadMore: function() {
+        if (this.loading) return;
+        this.request(this.offset + this.loadMoreCount, this.filters, false);
+    },
 
-		$.post(Config.URL + "admin/logging/search", {search: search, module: module, csrf_token_name: Config.CSRF}, function(data)
-		{
-			$("#log_list").fadeOut(150, function()
-			{
-				$(this).html(data).fadeIn(500, function()
-				{
-					$('[data-toggle="tooltip"]').tooltip();
-				});
-			});
-		});
-	},
-
-	loadMore: function()
-	{
-		this.id++;
-
-		this.offset += this.loadMoreCount;
-        this.logCount = $('#js_load_more').val();
-
-        // Hide the load more
-        $("#show_more_count").remove();
-
-        // Show ajax loading here
-
-        // Do the post request.
-		$.post(Config.URL + "admin/logging/loadMoreLogs", {offset: this.offset, count: this.loadMoreCount, show_more: this.logCount, csrf_token_name: Config.CSRF}, function(data)
-		{
-			data = "<div id='new_logs_" + Logging.id + "'>" + data + "</div>";
-
-			$("#log_list").append(data);
-
-			$("#new_logs_" + Logging.id).fadeIn(300, function()
-			{
-				$('[data-toggle="tooltip"]').tooltip();
-			});
-		});
-	}
-}
+    request: function(offset, filters, replace) {
+        this.loading = true;
+        $('#log_list').attr('aria-busy', 'true');
+        $.post(Config.URL + 'admin/logging/search', {search: filters.search, module: filters.module, offset: offset, csrf_token_name: Config.CSRF})
+            .done(function(data) {
+                Logging.offset = offset;
+                Logging.filters = filters;
+                $('#log_list .log-load-error').remove();
+                if (replace) $('#log_list').html(data);
+                else {
+                    $('#show_more_count').remove();
+                    $('#log_list').append(data);
+                }
+            }).fail(function() {
+                $('#log_list .log-load-error').remove();
+                $('<p class="log-load-error text-danger" role="alert">').text($('#log_list').data('load-error')).appendTo('#log_list');
+            }).always(function() {
+                Logging.loading = false;
+                $('#log_list').attr('aria-busy', 'false');
+            });
+    }
+};
