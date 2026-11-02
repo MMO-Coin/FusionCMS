@@ -3,6 +3,21 @@
 /** Select optional dependencies without changing third-party themes that use their own assets. */
 final class PublicAssets
 {
+    public static function version(string $path): string
+    {
+        $path = preg_split('/[?#]/', $path, 2)[0];
+        if (preg_match('~^https?://~i', $path)) {
+            if (!str_starts_with($path, base_url())) return 'external';
+            $path = substr($path, strlen(base_url()));
+        }
+        if (!is_file($path)) {
+            $path = ltrim($path, '/\\');
+            if (!preg_match('~^(?:application|node_modules|writable)[/\\\\]~', $path)) $path = 'application/' . $path;
+            $path = FCPATH . $path;
+        }
+        return is_file($path) ? substr(hash('sha256', filemtime($path) . ':' . filesize($path)), 0, 16) : '0';
+    }
+
     public static function select(array $assets, string $module, string $method, string $content, bool $slider, string $theme, array $sideboxes, array $required = []): array
     {
         $groups = array_fill_keys($required, true);

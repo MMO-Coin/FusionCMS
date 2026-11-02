@@ -35,7 +35,7 @@
 		<link rel="stylesheet" href="{if $cdn_link != false}{$cdn_link}{else}{$url}{/if}application/themes/admin/assets/css/theme.css">
 		<link rel="stylesheet" href="{if $cdn_link != false}{$cdn_link}{else}{$url}{/if}application/themes/admin/assets/css/custom.css">
 		{if $isRTL}<link rel="stylesheet" href="{if $cdn_link != false}{$cdn_link}{else}{$url}{/if}application/themes/admin/assets/css/rtl.css">{/if}
-		{if $extra_css}<link rel="stylesheet" href="{$url}application/{$extra_css}" type="text/css">{/if}
+		{if $extra_css}<link rel="stylesheet" href="{$url}application/{$extra_css}?v={$extra_css_version}" type="text/css">{/if}
 
 		<script src="{if $cdn_link != false}{$cdn_link}{else}{$url}{/if}application/themes/admin/assets/vendor/jquery/jquery.min.js"></script>
 		<script src="{if $cdn_link != false}{$cdn_link}{else}{$url}{/if}application/themes/admin/assets/vendor/bootstrap/js/bootstrap.bundle.min.js"></script>
@@ -87,7 +87,7 @@
 		var scripts = [
 			"{if $cdn_link != false}{$cdn_link}{else}{$url}{/if}application/js/jquery.placeholder.min.js",
 			"{if $cdn_link != false}{$cdn_link}{else}{$url}{/if}application/js/jquery.transit.min.js"
-			{if $extra_js},"{$url}application/{$extra_js}"{/if}
+			{if $extra_js},"{$url}application/{$extra_js}?v={$extra_js_version}"{/if}
 		];
 			require(scripts, function()
 		{

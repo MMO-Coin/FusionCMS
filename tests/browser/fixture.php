@@ -284,6 +284,12 @@ if ($action === 'cleanup') {
         $log->bind_param('issii', $id, $actionText, $type, $gm, $realmId); $log->execute();
     }
     echo 'Seeded bounded store, GM and guild lists.';
+} elseif ($action === 'versioned-asset') {
+    $name = $argv[3] ?? '';
+    if (!in_array($name, ['admin','default','heaven','core-default','core-heaven'], true)) throw new RuntimeException('Invalid version fixture');
+    $file = $name === 'admin' ? '/application/modules/store/js/admin_orders.js' : (str_starts_with($name, 'core-')
+        ? '/application/themes/' . substr($name, 5) . '/assets/js/app.js' : '/application/themes/' . $name . '/modules/news/js/news.js');
+    file_put_contents($site . $file, "\n/* Asset version fixture. */\n", FILE_APPEND);
 } elseif ($action === 'next-state') {
     $db->select_db($config['cms']);
     echo json_encode(['balances'=>$db->query('SELECT id,vp,dp FROM account_data ORDER BY id')->fetch_all(MYSQLI_ASSOC), 'orders'=>$db->query('SELECT id,completed FROM order_log ORDER BY id')->fetch_all(MYSQLI_ASSOC)], JSON_THROW_ON_ERROR);

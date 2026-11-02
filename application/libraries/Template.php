@@ -40,6 +40,12 @@ class Template
         $this->requiredAssets = array_values(array_unique(array_merge($this->requiredAssets, $groups)));
     }
 
+    public function assetVersion(string $path): string
+    {
+        require_once __DIR__ . '/PublicAssets.php';
+        return PublicAssets::version($path);
+    }
+
     private string $title;
     private bool|string $custom_description;
     private bool|string $custom_keywords;
@@ -395,6 +401,7 @@ class Template
 
         // Gather the header data
         $header_data = [
+            'asset_versioner' => $this,
             "style_path" => $this->style_path,
             "theme_path" => $this->theme_path,
             "full_theme_path" => $this->page_url . "application/" . $this->theme_path,

@@ -2,7 +2,17 @@
 
 if (PHP_SAPI !== 'cli') exit(1);
 require __DIR__ . '/../application/libraries/PublicAssets.php';
+define('FCPATH', dirname(__DIR__) . DIRECTORY_SEPARATOR);
+function base_url() { return 'https://example.invalid/cms/'; }
 function checkPublic($condition, $message) { if (!$condition) throw new RuntimeException($message); echo "PASS: $message\n"; }
+$module = 'modules/store/js/admin_orders.js';
+checkPublic(PublicAssets::version($module) !== '0' && PublicAssets::version($module) === PublicAssets::version(base_url() . 'application/' . $module), 'Module and local absolute URLs resolve to the same version');
+$temporary = tempnam(sys_get_temp_dir(), 'fusion-asset-');
+try {
+    file_put_contents($temporary, 'one'); $old = PublicAssets::version($temporary);
+    file_put_contents($temporary, 'changed asset'); clearstatcache(true, $temporary);
+    checkPublic($old !== PublicAssets::version($temporary), 'Changing an asset changes its URL version even within the same second');
+} finally { unlink($temporary); }
 foreach (['default', 'heaven'] as $theme) {
     $files = ['/node_modules/jquery/dist/jquery.min.js', '/node_modules/datatables/media/js/jquery.dataTables.min.js', '/node_modules/owl.carousel/dist/owl.carousel.min.js',
         '/application/js/flux.min.js', '/themes/' . $theme . '/modules/sidebox_poll/js/poll.js', '/themes/' . $theme . '/assets/js/app.js'];

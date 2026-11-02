@@ -10,6 +10,11 @@ test('store orders and GM history have real server pages, matching filters and e
     seed(); await owner(page);
     const errors=[]; page.on('pageerror', error=>errors.push(error.message));
     await page.goto('/store/admin_orders');
+    const refundScript = page.locator('script[src*="modules/store/js/admin_orders.js"]');
+    const oldRefundUrl = await refundScript.getAttribute('src');
+    expect(new URL(oldRefundUrl).searchParams.get('v')).toMatch(/^[a-f0-9]{16}$/);
+    fixture('versioned-asset','admin'); await page.reload();
+    expect(await refundScript.getAttribute('src')).not.toBe(oldRefundUrl);
     const orders=page.locator('#orders-table tbody tr[data-order]');
     await expect(orders).toHaveCount(25); expect(await orders.first().getAttribute('data-order')).toBe('65');
     await expect(page.locator('#orders-total')).toHaveText('65');
@@ -83,11 +88,24 @@ for(const theme of ['default','heaven']) test(`${theme} public assets stay isola
         expect(await page.evaluate(()=>typeof $.fn.DataTable)).toBe('undefined');
         expect(await page.evaluate(()=>typeof $.fn.owlCarousel)).toBe('undefined');
         expect(await page.evaluate(()=>typeof flux)).toBe('undefined');
+        if(mode==='files') {
+            const appUrl = () => page.locator('script[src]').evaluateAll((nodes, theme) => nodes.find(node => node.src.includes(`/themes/${theme}/assets/js/app.js`))?.src, theme);
+            const oldAppUrl = await appUrl();
+            expect(new URL(oldAppUrl).searchParams.get('asset')).toMatch(/^[a-f0-9]{16}$/);
+            fixture('versioned-asset','core-'+theme); await page.reload();
+            expect(await appUrl()).not.toBe(oldAppUrl);
+        }
         const base=mode==='minified' ? await page.locator('script[src*="public-"]').getAttribute('src') : '';
         await page.goto('/armory'); expect(await page.evaluate(()=>typeof $.fn.DataTable)).toBe('function');
         if(mode==='minified') expect(await page.locator('script[src*="public-"]').getAttribute('src')).not.toBe(base);
         await page.goto(theme==='heaven' ? '/news/view/1' : '/news');
         await expect(page.locator(theme==='heaven' ? '[owl].owl-loaded' : '.news-carousel.owl-loaded')).toHaveCount(1);
+        const newsUrl = () => page.locator('script[src]').evaluateAll((nodes, theme) => nodes.find(node => node.src.includes(`/themes/${theme}/modules/news/js/news.js`))?.src, theme);
+        const oldNewsUrl = await newsUrl();
+        expect(oldNewsUrl).toBeTruthy();
+        expect(new URL(oldNewsUrl).searchParams.get('v')).toMatch(/^[a-f0-9]{16}$/);
+        fixture('versioned-asset',theme); await page.reload();
+        expect(await newsUrl()).not.toBe(oldNewsUrl);
         fixture('public-media','slider'); await page.goto('/news');
         if(theme==='default') expect(await page.evaluate(()=>typeof flux.slider)).toBe('function');
         else await expect(page.locator('[owl-carousel="main"].owl-loaded')).toHaveCount(1);

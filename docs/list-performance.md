@@ -29,4 +29,6 @@ $this->template->view($content, false, 'modules/example/js/page.js');
 
 Supported public groups are `datatables`, `carousel` and `slider`. Themes with their own asset configuration keep their existing loading behavior. The bundled themes give each dependency combination a separate minified filename, including the theme and local file metadata in its fingerprint. This prevents one page's reduced bundle from replacing another page's dependencies and refreshes the filename when local assets change.
 
+Public theme module scripts and styles, and admin module scripts and styles, also receive file-based version parameters. Updating a module changes its asset URL, including when the theme version is unchanged. Individual shared files receive version parameters when minification is disabled, too. This keeps cached scripts from calling an older action or expecting a removed global plugin.
+
 The optional shared AJAX router follows full-page responses with a normal navigation so dependencies are loaded before page scripts execute. Clear any proxy or CDN cache serving old HTML after updating.

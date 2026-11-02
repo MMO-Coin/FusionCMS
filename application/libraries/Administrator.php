@@ -301,6 +301,8 @@ class Administrator
             "title" => $this->title,
             "extra_js" => $js,
             "extra_css" => $css,
+            "extra_js_version" => $js ? $this->template->assetVersion($js) : '',
+            "extra_css_version" => $css ? $this->template->assetVersion($css) : '',
             "admin_assets" => $assets,
             "nickname" => $this->user->getNickname(),
             "current_page" => $this->currentPage,

@@ -209,11 +209,16 @@ function __minify_print__(string $type = '', array $files = [], string $queries 
         if(__minify_hasImport__($file))
             $type = 'css_inline';
 
+        $fileQueries = $queries;
+        if ($type !== 'css_inline' && filter_var($file, FILTER_VALIDATE_URL) === false && is_file($file)) {
+            $fileQueries .= ($fileQueries === '' ? '?' : '&') . 'asset=' . substr(hash('sha256', filemtime($file) . ':' . filesize($file)), 0, 16);
+        }
+
         // Swap ROOTPATH with ROOTURL
         $file = str_replace(MIN_ROOTPATH, MIN_ROOTURL, $file);
 
         // Append to output
-        $output .= str_replace(['__file__', '__query__'], [$file, $queries], $tags[$type]) . PHP_EOL;
+        $output .= str_replace(['__file__', '__query__'], [$file, $fileQueries], $tags[$type]) . PHP_EOL;
     }
 
     return $output;
