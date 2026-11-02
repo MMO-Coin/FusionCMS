@@ -1,9 +1,31 @@
 <?php
 
 require_once dirname(__DIR__, 3) . '/libraries/PageBounds.php';
+require_once dirname(__DIR__, 3) . '/libraries/ArmoryCountCache.php';
 
 class Armory_model extends CI_Model
 {
+    public function get_search_count(string $type, string $search, int $realmId, bool $refresh = false): int
+    {
+        $term = $this->searchTerm($search);
+        if (!in_array($type, ['characters', 'items', 'guilds'], true) || $term === null || !$this->realms->realmExists($realmId)) return 0;
+        if ($type === 'items' && $this->realms->getRealm($realmId)->getExpansionId() > 4) return 0;
+        $cache = new ArmoryCountCache((bool) $this->config->item('cache'));
+        return $cache->remember($realmId, $type, $term, function() use ($type, $term, $realmId): int {
+            // countAllResults() can return zero after a failed query when DBDebug is off.
+            $builder = match ($type) {
+                'characters' => $this->characterQuery($term, $realmId),
+                'items' => $this->itemQuery($term, $realmId),
+                'guilds' => $this->guildQuery($term, $realmId),
+            };
+            $result = $builder->select('COUNT(*) AS numrows')->get();
+            if (!$result instanceof \CodeIgniter\Database\ResultInterface) throw new RuntimeException('Unable to count Armory search results');
+            $count = filter_var($result->getRowArray()['numrows'] ?? null, FILTER_VALIDATE_INT, ['options' => ['min_range' => 0]]);
+            if ($count === false) throw new RuntimeException('Unable to count Armory search results');
+            return $count;
+        }, $refresh);
+    }
+
     private function searchTerm(string $search): ?string
     {
         $search = trim($search);

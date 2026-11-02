@@ -1,6 +1,6 @@
 # Armory database profiling
 
-`tests/armory_profile.php` measures the current Armory model with synthetic data using the Trinity and VMaNGOS column mappings. It adds measurement only: application search behavior and existing realm schemas stay unchanged, and no production data is used.
+`tests/armory_profile.php` measures uncached Armory queries and repeated pages with a primed count cache, using synthetic data and the Trinity and VMaNGOS column mappings. Search still matches text anywhere in the name. No production data is used.
 
 ## Run a profile
 
@@ -60,11 +60,28 @@ The count remains the main character-search cost. In the 100,000-row Trinity run
 
 `EXPLAIN` row figures are optimizer estimates. The handler counters describe storage-engine read activity, rather than exact rows examined; see the [MariaDB status-variable reference](https://mariadb.com/docs/server/server-management/variables-and-modes/server-status-variables). These local measurements do not establish production capacity.
 
-## Choosing the next change
+## Count cache comparison
+
+Armory now keeps up to 128 search counts for 30 seconds when site caching is enabled. Pagination can reuse a count while fetching current page rows. Submitting Search again refreshes the count. See the [Armory guide](../admin-assets.md#armory-search) for the cache policy.
+
+A second local run used the same server, PHP version, buffer-pool size, 100,000-row fixture and nine-sample method. The profiler primed the filesystem count cache before measuring the same first `Hero` page. These figures compare uncached count plus page against cached count plus a fresh page within that run:
+
+| Mapping | Result type | Uncached median ms | Cache-hit median ms | SQL queries before / after |
+| --- | --- | ---: | ---: | --- |
+| Trinity | Characters | 11.596 | 0.402 | 2 / 1 |
+| Trinity | Items | 26.350 | 14.860 | 2 / 1 |
+| Trinity | Guilds | 11.950 | 0.696 | 3 / 2 |
+| VMaNGOS | Characters | 11.650 | 0.492 | 2 / 1 |
+| VMaNGOS | Items | 26.193 | 14.963 | 2 / 1 |
+| VMaNGOS | Guilds | 11.932 | 0.641 | 3 / 2 |
+
+The cache-assisted measurements use the count-cache helper with the model's count and page methods. Initial cache filling and explicit Search refreshes still run the count query. These are single-client, warm-buffer database-path timings, excluding HTTP and browser work. The profiler checks that each primed page removes exactly one SQL query and still returns the expected current rows; CI has no timing threshold.
+
+## Remaining search cost
 
 The tool also compares contains and prefix counts as an analytical experiment. At 100,000 Trinity character rows, `Hero%` took 0.266 ms and matched 1,000 names, while `%Hero%` took 11.377 ms and matched 2,000. Prefix matching lost 1,000 interior matches such as `AncientHero...`, so it cannot replace contains matching without changing the feature. A constant `LIKE` pattern without a leading wildcard can support a B-tree range; the [MySQL range-optimization reference](https://dev.mysql.com/doc/refman/8.0/en/range-optimization.html) explains that distinction.
 
-The next batch should start with a bounded, short-lived count cache for repeated pages of the same search, preserving contains matching. Its keys and expiry need tests for realm, result type, search text and changed data. Then profile repeated searches and item pages with representative realm data. If that still shows a problem, consider an opt-in prefix or exact-search mode with clear UI wording. A separate search index or realm schema changes should wait for that evidence.
+Item pages still scan and sort in this fixture after the count is cached. Profile those queries with representative realm data before changing their query or indexes. If substring search remains expensive, an opt-in prefix or exact-search mode needs clear UI wording. A separate search index or realm schema changes should wait for that evidence.
 
 ## CI coverage
 

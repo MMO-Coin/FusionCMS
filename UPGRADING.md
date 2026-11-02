@@ -17,6 +17,8 @@ Both scripts preserve existing rows, can be rerun and reuse equivalent custom in
 
 Email logs now show 25 records per page, newest ID first, with search handled by the server. Account and website log pages use timestamp and ID ordering, and requests cannot select more than 100 records at once. Clear compiled templates after deploying the login labels and keyboard password toggle.
 
+The Armory count cache requires no SQL migration or game database changes. With the global `cache` setting enabled, totals can lag database changes by up to 30 seconds while fetched rows stay fresh. Submit Search again, or change the realm or result type, to refresh totals immediately. Browsing pages does not renew the expiry, and setting `cache` to `false` disables count reuse. See the [Armory search notes](docs/admin-assets.md#armory-search) for the cache limit and fallback behavior.
+
 The bundled English, French, Persian, Portuguese and Spanish language files include the new login and log navigation labels. Merge those new keys from the English files into any custom language packs you maintain.
 
 1. Test the upgrade on a separate copy of your site and website database. Pause donations and other writes while upgrading the actual site.

@@ -55,6 +55,23 @@ function assertOwner(mysqli $db, string $database, string $nonce): void {
     $owner = $db->query("SELECT nonce FROM `$database`.`_fusion_e2e_owner`")->fetch_assoc();
     if (!$owner || !hash_equals($nonce, $owner['nonce'])) throw new RuntimeException('Fixture ownership check failed.');
 }
+function armoryCountCachePath(array $config): string {
+    $ownedRoot = realpath($config['root']);
+    $tempRoot = realpath(sys_get_temp_dir()); $ownedSite = realpath($config['root'] . '/site');
+    $samePath = static fn(string $left, string $right): bool => PHP_OS_FAMILY === 'Windows' ? strcasecmp($left, $right) === 0 : $left === $right;
+    if ($ownedRoot === false || $tempRoot === false || $ownedSite === false || !$samePath(dirname($ownedRoot), $tempRoot)
+        || !str_starts_with(basename($ownedRoot), 'fusioncms-browser-e2e-')
+        || !$samePath($ownedSite, $ownedRoot . DIRECTORY_SEPARATOR . 'site')) {
+        throw new RuntimeException('Refusing an unmanaged Armory cache path.');
+    }
+    return $ownedRoot . '/site/writable/cache/data/search/armory_counts_v1.cache';
+}
+function clearArmoryCountCache(array $config): void {
+    $path = armoryCountCachePath($config);
+    foreach ([$path, dirname($path) . '/armory_counts_v1.tmp'] as $file) {
+        if (is_file($file) && !is_link($file)) unlink($file);
+    }
+}
 function resetFixture(mysqli $db, array $config): void {
     $db->select_db($config['cms']);
     foreach (['donate_mmo_transactions', 'monthly_income', 'failed_logins', 'remember_me_tokens', 'password_recovery_key', 'email_log', 'account_session_versions', 'account_totp_uses', 'account_sessions', 'private_message', 'comments', 'article_tag', 'articles', 'realms', 'order_log', 'gm_log', 'store_items', 'image_slider', 'daily_signups', 'monthly_votes', 'visitor_log'] as $table) $db->query("DELETE FROM `$table`");
@@ -81,6 +98,7 @@ function resetFixture(mysqli $db, array $config): void {
     foreach (['*.cache', 'messages/*'] as $pattern) {
         foreach (glob($config['root'] . '/site/writable/cache/data/' . $pattern) as $file) if (is_file($file)) unlink($file);
     }
+    clearArmoryCountCache($config);
     copy(dirname(__DIR__, 2) . '/application/config/Session.php', $config['root'] . '/site/application/config/Session.php');
 }
 function seedFixtureRealm(mysqli $db, array $config, int $id, string $name): void {
@@ -90,6 +108,7 @@ function seedFixtureRealm(mysqli $db, array $config, int $id, string $name): voi
 }
 function seedArmoryFixture(mysqli $db, array $config): void {
     $site = $config['root'] . '/site';
+    clearArmoryCountCache($config);
     seedFixtureRealm($db, $config, 1, 'Browser Realm');
     $db->select_db($config['auth']);
     for ($id = 1; $id <= 125; $id++) {
@@ -272,6 +291,29 @@ if ($action === 'cleanup') {
     echo json_encode($row, JSON_THROW_ON_ERROR);
 } elseif ($action === 'seed-armory') {
     seedArmoryFixture($db, $config);
+} elseif ($action === 'armory-count-cache') {
+    $path = armoryCountCachePath($config);
+    echo is_file($path) ? file_get_contents($path) : '{"version":1,"entries":{}}';
+} elseif ($action === 'expire-armory-count-cache') {
+    $path = armoryCountCachePath($config);
+    $value = json_decode(file_get_contents($path), true, 512, JSON_THROW_ON_ERROR);
+    foreach ($value['entries'] as &$entry) $entry['created'] = microtime(true) - 31;
+    unset($entry);
+    file_put_contents($path, json_encode($value, JSON_THROW_ON_ERROR), LOCK_EX);
+} elseif ($action === 'armory-change-data') {
+    seedFixtureRealm($db, $config, 2, 'Second Armory Realm');
+    $db->select_db($config['auth']);
+    $db->query("INSERT INTO characters (guid,name,race,gender,class,level,online) VALUES (126,'Search126',1,0,1,60,0)");
+    $db->query('UPDATE characters SET level=61 WHERE guid=11');
+} elseif ($action === 'armory-delete-added-character') {
+    $db->select_db($config['auth']);
+    $db->query('DELETE FROM characters WHERE guid=126');
+} elseif ($action === 'armory-add-zero-match') {
+    $db->select_db($config['auth']);
+    $db->query("INSERT INTO characters (guid,name,race,gender,class,level,online) VALUES (300,'ArrivalHero',1,0,1,60,0)");
+} elseif ($action === 'disable-armory-cache') {
+    require_once $site . '/application/libraries/ConfigEditor.php';
+    $editor = new ConfigEditor($site . '/application/config/fusion.php'); $editor->set('cache', false); $editor->save();
 } elseif ($action === 'seed-store-catalogue') {
     seedArmoryFixture($db, $config);
     seedFixtureRealm($db, $config, 2, 'Second Realm');

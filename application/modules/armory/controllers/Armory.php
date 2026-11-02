@@ -58,12 +58,13 @@ class Armory extends MX_Controller
         $search = $this->input->post('search', false);
         $search = is_string($search) ? trim($search) : '';
         header('Content-Type: application/json; charset=utf-8');
+        header('Cache-Control: no-store');
         if (!$this->input->is_ajax_request() || !$bounds || !$realm || !in_array($type, ['items', 'guilds', 'characters'], true)
             || mb_strlen($search) < 3 || mb_strlen($search) > 100 || !$this->realms->realmExists($realm)) {
             http_response_code(400);
             die(json_encode(['draw' => $draw, 'recordsTotal' => 0, 'recordsFiltered' => 0, 'data' => [], 'error' => lang('search_invalid', 'armory')]));
         }
-        $total = $this->armory_model->{'get_' . $type . '_count'}($search, $realm);
+        $total = $this->armory_model->get_search_count($type, $search, $realm, $this->input->post('refresh') === '1');
         $rows = $bounds[0] < $total ? $this->armory_model->{'get_' . $type}($search, $bounds[1], $bounds[0], $realm) : [];
         $result = [];
         foreach ($rows as $row) {

@@ -150,6 +150,39 @@ namespace {
         return ['warmup_ms' => round($warmMs, 3), 'timing' => timeSummary(array_column($samples, 'elapsed_ms')),
             'query_count' => count($queries), 'samples' => $samples, 'queries' => $plans, 'result' => $result];
     }
+    function profileCachedCounts($db, Armory_model $model, int $rows, int $iterations): array {
+        $nonce = bin2hex(random_bytes(12));
+        $directory = sys_get_temp_dir() . DIRECTORY_SEPARATOR . 'fusion-armory-count-profile-' . $nonce;
+        profileAssert(mkdir($directory, 0700), 'Could not create temporary count cache');
+        profileAssert(file_put_contents($directory . '/owner', $nonce) === strlen($nonce), 'Could not mark temporary count cache');
+        try {
+            $cache = new ArmoryCountCache(true, $directory); $workloads = [];
+            foreach (['characters', 'items', 'guilds'] as $type) {
+                $expected = expectedIds($rows, 'Hero', $type);
+                $load = fn() => $model->{'get_' . $type . '_count'}('Hero', 1);
+                $cache->remember(1, $type, 'Hero', $load, true);
+                foreach (['first' => 0, 'deep' => max(0, min(5000, intdiv(count($expected) - 1, 10) * 10))] as $page => $offset) {
+                    $operation = function() use ($cache, $load, $model, $type, $offset) {
+                        $total = $cache->remember(1, $type, 'Hero', $load);
+                        return [$total, $offset < $total ? $model->{'get_' . $type}('Hero', 10, $offset, 1) : []];
+                    };
+                    $measured = measure($db, $operation, fn($result) => verifyResult($result, $expected, $type, $offset), $iterations);
+                    profileAssert($measured['query_count'] === ($type === 'guilds' ? 2 : 1), 'Cached page unexpectedly repeated the search count');
+                    unset($measured['result']);
+                    $workloads[] = ['type' => $type, 'page' => $page, 'term' => 'Hero', 'offset' => $offset] + $measured;
+                }
+            }
+            return ['ttl_seconds' => ArmoryCountCache::TTL, 'maximum_entries' => ArmoryCountCache::MAX_ENTRIES,
+                'measurement' => 'Primed filesystem count cache plus fresh model page, with excluded warm-up. Initial count and HTTP handling are excluded.', 'workloads' => $workloads];
+        } finally {
+            profileAssert(dirname((string) realpath($directory)) === realpath(sys_get_temp_dir())
+                && file_get_contents($directory . '/owner') === $nonce, 'Refusing unexpected count cache cleanup');
+            foreach (['armory_counts_v1.cache', 'armory_counts_v1.lock', 'armory_counts_v1.tmp', 'owner'] as $file) {
+                if (is_file($directory . '/' . $file)) profileAssert(unlink($directory . '/' . $file), 'Could not remove temporary count cache file');
+            }
+            profileAssert(rmdir($directory), 'Could not remove temporary count cache directory');
+        }
+    }
     function profileEmulator($db, string $emulator, int $rows, int $iterations): array {
         $GLOBALS['emulator'] = (new \ReflectionClass($emulator))->newInstanceWithoutConstructor();
         fwrite(STDERR, "Seeding $emulator: $rows rows per searchable table\n");
@@ -180,8 +213,9 @@ namespace {
         }
         $comparison['semantics'] = 'Analytical comparison only. Prefix matching excludes interior matches and is not an equivalent replacement for the application query.';
         $comparison['interior_matches_lost_by_prefix'] = $comparison['contains']['matching_rows'] - $comparison['prefix_candidate']['matching_rows'];
+        $cached = profileCachedCounts($db, $model, $rows, $iterations);
         foreach (array_keys($setup) as $name) $db->query('DROP TABLE ' . identifier(table($name)));
-        return ['setup' => $setup, 'workloads' => $workloads, 'prefix_comparison' => $comparison];
+        return ['setup' => $setup, 'workloads' => $workloads, 'prefix_comparison' => $comparison, 'count_cache' => $cached];
     }
 
     try {

@@ -55,12 +55,18 @@ test('Armory treats search text literally and rejects malformed pagination', asy
 test('Armory retries failed requests and reuses tables when filters change', async ({page}) => {
     fixture('seed-armory'); await openPage(page, '/armory');
     const errors = []; page.on('pageerror', error => errors.push(error.message));
+    const requests = [];
+    page.on('request', request => {
+        if (new URL(request.url()).pathname === '/armory/search') requests.push(new URLSearchParams(request.postData()));
+    });
     await page.route('**/armory/search', route => route.fulfill({status: 503, body: 'Unavailable'}));
     await search(page, 'Search');
     await expect(page.getByRole('alert')).toContainText('Unable to load');
+    expect(requests.at(-1).get('refresh')).toBe('1');
     await page.unroute('**/armory/search');
     await search(page, 'Search');
     await expect(page.locator('#search_results_characters tbody tr')).toHaveCount(10);
+    expect(requests.at(-1).get('refresh')).toBe('1');
     await search(page, 'Literal%');
     await expect(page.locator('#search_results_characters tbody tr')).toHaveCount(1);
     await expect(page.locator('#search_results_characters tbody')).toContainText('Literal%Name');
@@ -85,4 +91,59 @@ test('Armory retries failed requests and reuses tables when filters change', asy
     await expect(page.locator('#search_results_characters_wrapper')).toBeHidden();
     await expect(page.locator('#armory-search button')).toBeEnabled();
     expect(errors).toEqual([]);
+});
+
+test('Armory reuses counts across pages while rows stay current and search submission refreshes totals', async ({page}) => {
+    fixture('seed-armory'); await openPage(page, '/armory');
+    const response = await query(page);
+    expect(response.headers()['cache-control']).toContain('no-store');
+    expect((await response.json()).recordsFiltered).toBe(125);
+    const initialCache = JSON.parse(fixture('armory-count-cache'));
+    expect(Object.values(initialCache.entries)).toHaveLength(1);
+
+    fixture('armory-change-data');
+    const cached = await (await query(page, {start: '10'})).json();
+    expect(cached.recordsFiltered).toBe(125);
+    expect(cached.data[0].name).toBe('Search011'); expect(Number(cached.data[0].level)).toBe(61);
+    expect(JSON.parse(fixture('armory-count-cache')).entries).toEqual(initialCache.entries);
+    // A count query here would return 126. Different realms and result types get their own totals.
+    expect((await (await query(page, {realm: '2'})).json()).recordsFiltered).toBe(126);
+    expect((await (await query(page, {table: 'guilds'})).json()).recordsFiltered).toBe(125);
+    expect((await (await query(page, {table: 'items'})).json()).recordsFiltered).toBe(125);
+    expect((await (await query(page)).json()).recordsFiltered).toBe(125);
+
+    const submitted = page.waitForResponse(response => new URL(response.url()).pathname === '/armory/search');
+    await search(page, 'Search');
+    const fresh = await submitted;
+    expect(new URLSearchParams(fresh.request().postData()).get('refresh')).toBe('1');
+    expect((await fresh.json()).recordsFiltered).toBe(126);
+    const nextPage = page.waitForResponse(response => new URL(response.url()).pathname === '/armory/search');
+    await page.locator('#search_results_characters_next').click();
+    const paged = await nextPage;
+    expect(new URLSearchParams(paged.request().postData()).get('refresh')).toBe('0');
+    expect((await paged.json()).recordsFiltered).toBe(126);
+    await expect(page.locator('#search_results_characters tbody tr').first()).toContainText('Search011');
+});
+
+test('Armory count expiry, zero matches and disabled caching observe database changes', async ({page}) => {
+    fixture('seed-armory'); await openPage(page, '/armory');
+    expect((await (await query(page)).json()).recordsFiltered).toBe(125);
+    fixture('armory-change-data');
+    expect((await (await query(page)).json()).recordsFiltered).toBe(125);
+    fixture('expire-armory-count-cache');
+    expect((await (await query(page)).json()).recordsFiltered).toBe(126);
+
+    expect((await (await query(page, {search: 'Arrival'})).json()).recordsFiltered).toBe(0);
+    fixture('armory-add-zero-match');
+    const missing = await (await query(page, {search: 'Arrival'})).json();
+    expect(missing.recordsFiltered).toBe(0); expect(missing.data).toEqual([]);
+    const refreshed = await (await query(page, {search: 'Arrival', refresh: '1'})).json();
+    expect(refreshed.recordsFiltered).toBe(1); expect(refreshed.data[0].name).toBe('ArrivalHero');
+
+    fixture('armory-delete-added-character');
+    expect((await (await query(page)).json()).recordsFiltered).toBe(126);
+    const cachedBeforeDisable = JSON.parse(fixture('armory-count-cache'));
+    fixture('disable-armory-cache');
+    expect((await (await query(page)).json()).recordsFiltered).toBe(125);
+    expect(JSON.parse(fixture('armory-count-cache'))).toEqual(cachedBeforeDisable);
 });

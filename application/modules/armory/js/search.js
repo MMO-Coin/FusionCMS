@@ -23,7 +23,7 @@ var Search = {
         if (!realm || search.length > 100 || !['items', 'guilds', 'characters'].includes(type)) { this.error(lang('search_invalid', 'armory')); return; }
         Object.keys(this.pending).forEach(function(name) { if (Search.pending[name]) Search.pending[name].abort(); });
         this.active = type;
-        this.filters[type] = {search: search, realm: realm};
+        this.filters[type] = {search: search, realm: realm, refresh: true};
         this.error('');
         if (this.tables[type]) this.tables[type].ajax.reload(null, true);
         else {
@@ -35,10 +35,11 @@ var Search = {
                     Search.busy(true);
                     var request = $.ajax({url: Config.URL + 'armory/search', method: 'POST', dataType: 'json', data: {
                         realm: filter.realm, table: type, search: filter.search, start: data.start, length: data.length,
-                        draw: data.draw, csrf_token_name: Config.CSRF
+                        draw: data.draw, refresh: filter.refresh ? '1' : '0', csrf_token_name: Config.CSRF
                     }}).done(function(result) {
                         if (Search.filters[type] !== filter) return;
                         callback(result);
+                        if (!result.error) filter.refresh = false;
                         if (Search.active === type) Search.error('');
                         Tooltip.refresh();
                     }).fail(function(xhr, status) {
