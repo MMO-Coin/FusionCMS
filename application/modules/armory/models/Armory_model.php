@@ -1,107 +1,105 @@
 <?php
 
-use CodeIgniter\Database\BaseConnection;
+require_once dirname(__DIR__, 3) . '/libraries/PageBounds.php';
 
 class Armory_model extends CI_Model
 {
-    private BaseConnection $c_connection;
-    private BaseConnection $w_connection;
-
-    public function get_items(string $searchString, int $limit, int $offset, int $realmId = 1)
+    private function searchTerm(string $search): ?string
     {
-        //Connect to the world database
-        $realm = $this->realms->getRealm($realmId);
+        $search = trim($search);
+        return mb_strlen($search) >= 3 && mb_strlen($search) <= 100 ? $search : null;
+    }
 
-        // In patch 6.x.x and higher, the item_template table has been removed.
-        if ($realm->getExpansionId() > 4)
-            return false;
+    private function filtered($db, string $tableName, string $field, string $search)
+    {
+        $escape = $db->likeEscapeChar;
+        $search = strtr($search, [$escape => $escape . $escape, '%' => $escape . '%', '_' => $escape . '_']);
+        return $db->table($tableName)->like($field, $search, 'both', true);
+    }
 
-        $this->w_connection = $realm->getWorld()->getConnection();
+    private function itemQuery(string $search, int $realmId)
+    {
+        $realm = $this->realms->realmExists($realmId) ? $this->realms->getRealm($realmId) : null;
+        $term = $this->searchTerm($search);
+        if (!$realm || $realm->getExpansionId() > 4 || $term === null) return null;
+        return $this->filtered($realm->getWorld()->getConnection(), table('item_template', $realmId), column('item_template', 'name', false, $realmId), $term);
+    }
 
-        $searchString = $this->w_connection->escapeString($searchString);
+    public function get_items(string $search, $limit, $offset, int $realmId = 1): array
+    {
+        $bounds = PageBounds::bounds($offset, $limit);
+        if (!$bounds || !($builder = $this->itemQuery($search, $realmId))) return [];
+        return $builder->select(columns('item_template', ['entry', 'name', 'ItemLevel', 'RequiredLevel', 'InventoryType', 'Quality', 'class', 'subclass'], $realmId))
+            ->orderBy(column('item_template', 'ItemLevel', false, $realmId), 'DESC')
+            ->orderBy(column('item_template', 'entry', false, $realmId), 'ASC')
+            ->limit($bounds[1], $bounds[0])->get()->getResultArray();
+    }
 
-        //Get the connection and run a query
-        $query = $this->w_connection->query("SELECT " . columns("item_template", ["entry", "name", "ItemLevel", "RequiredLevel", "InventoryType", "Quality", "class", "subclass"], $realmId) . " FROM " . table("item_template", $realmId) . " WHERE UPPER(" . column("item_template", "name", false, $realmId) . ") LIKE ? ORDER BY " . column("item_template", "ItemLevel", false, $realmId) . " DESC LIMIT ".$limit." OFFSET ".$offset, ['%' . strtoupper($searchString) . '%']);
+    public function get_items_count(string $search, int $realmId): int
+    {
+        $builder = $this->itemQuery($search, $realmId);
+        return $builder ? $builder->countAllResults() : 0;
+    }
 
-        if ($query->getNumRows() > 0) {
-            return $query->getResultArray();
-        } else {
-            return false;
+    private function characterQuery(string $search, int $realmId)
+    {
+        $realm = $this->realms->realmExists($realmId) ? $this->realms->getRealm($realmId) : null;
+        $term = $this->searchTerm($search);
+        if (!$realm || $term === null) return null;
+        return $this->filtered($realm->getCharacters()->getConnection(), table('characters', $realmId), column('characters', 'name', false, $realmId), $term);
+    }
+
+    public function get_characters(string $search, $limit, $offset, int $realmId = 1): array
+    {
+        $bounds = PageBounds::bounds($offset, $limit);
+        if (!$bounds || !($builder = $this->characterQuery($search, $realmId))) return [];
+        return $builder->select(columns('characters', ['guid', 'name', 'race', 'gender', 'class', 'level'], $realmId))
+            ->orderBy(column('characters', 'name', false, $realmId), 'ASC')
+            ->orderBy(column('characters', 'guid', false, $realmId), 'ASC')
+            ->limit($bounds[1], $bounds[0])->get()->getResultArray();
+    }
+
+    public function get_characters_count(string $search, int $realmId): int
+    {
+        $builder = $this->characterQuery($search, $realmId);
+        return $builder ? $builder->countAllResults() : 0;
+    }
+
+    private function guildQuery(string $search, int $realmId)
+    {
+        $realm = $this->realms->realmExists($realmId) ? $this->realms->getRealm($realmId) : null;
+        $term = $this->searchTerm($search);
+        if (!$realm || $term === null) return null;
+        return $this->filtered($realm->getCharacters()->getConnection(), table('guild', $realmId) . ' g', 'g.' . column('guild', 'name', false, $realmId), $term);
+    }
+
+    public function get_guilds(string $search, $limit, $offset, int $realmId = 1): array
+    {
+        $bounds = PageBounds::bounds($offset, $limit);
+        if (!$bounds || !($builder = $this->guildQuery($search, $realmId))) return [];
+        $id = column('guild', 'guildid', false, $realmId);
+        $name = column('guild', 'name', false, $realmId);
+        $leader = column('guild', 'leaderguid', false, $realmId);
+        $rows = $builder->select("g.$id AS guildid, g.$name AS name, g.$leader AS leaderguid, c." . column('characters', 'name', false, $realmId) . ' AS leaderName')
+            ->join(table('characters', $realmId) . ' c', 'c.' . column('characters', 'guid', false, $realmId) . " = g.$leader", 'left')
+            ->orderBy("g.$name", 'ASC')->orderBy("g.$id", 'ASC')->limit($bounds[1], $bounds[0])->get()->getResultArray();
+        if (!$rows) return [];
+        // Count members only for this page, without grouping or sorting the entire search result.
+        $memberGuild = column('guild_member', 'guildid', false, $realmId);
+        $counts = $this->realms->getRealm($realmId)->getCharacters()->getConnection()->table(table('guild_member', $realmId))
+            ->select($memberGuild . ' AS guildid, COUNT(*) AS total')->whereIn($memberGuild, array_column($rows, 'guildid'))
+            ->groupBy($memberGuild)->get()->getResultArray();
+        $counts = array_column($counts, 'total', 'guildid');
+        foreach ($rows as &$row) {
+            $row['GuildMemberCount'] = (int) ($counts[$row['guildid']] ?? 0);
+            $row['leaderName'] = $row['leaderName'] ?? '';
         }
+        return $rows;
     }
 
-    public function get_items_count(string $string, int $realmId)
+    public function get_guilds_count(string $search, int $realmId): int
     {
-        $realm = $this->realms->getRealm($realmId);
-
-        // In patch 6.x.x and higher, the item_template table has been removed.
-        if ($realm->getExpansionId() > 4)
-            return 0;
-
-        $this->w_connection = $realm->getWorld()->getConnection();
-        
-        $string = $this->w_connection->escapeString($string);
-
-        return $this->w_connection->table(table("item_template", $realmId))->like(column("item_template", "name", false, $realmId), $string)->countAllResults();
-    }
-
-    public function get_guilds(string $searchString, int $limit, int $offset, int $realmId = 1)
-    {
-        //Connect to the character database
-        $realm = $this->realms->getRealm($realmId);
-
-        $this->c_connection = $realm->getCharacters()->getConnection();
-
-        $searchString = $this->c_connection->escapeString($searchString);
-
-        $query = $this->c_connection->query(query("find_guilds", $realmId), ['%' . $searchString . '%']);
-
-        if ($query->getNumRows() > 0) {
-            return $query->getResultArray();
-        } else {
-            return false;
-        }
-    }
-
-    public function get_guilds_count(string $string, int $realmId)
-    {
-        $realm = $this->realms->getRealm($realmId);
-
-        $this->c_connection = $realm->getCharacters()->getConnection();
-        
-        $string = $this->c_connection->escapeString($string);
-
-        return $this->c_connection->table(table("guild", $realmId))->like(column("guild", "name", false, $realmId), $string)->countAllResults();
-    }
-
-    public function get_characters(string $searchString, int $limit, int $offset, int $realmId = 1)
-    {
-        $realm = $this->realms->getRealm($realmId);
-
-        $this->c_connection = $realm->getCharacters()->getConnection();
-
-        $searchString = $this->c_connection->escapeString($searchString);
-
-        $builder = $this->c_connection->table(table("characters", $realmId))->select(columns("characters", ["guid", "name", "race", "gender", "class", "level"], $realmId));
-        $builder->like(column("characters", "name", false, $realmId), ucfirst($searchString));
-        $builder->limit($limit, $offset);
-        $result = $builder->get();
-
-        if ($result->getNumRows() > 0) {
-            return $result->getResultArray();
-        } else {
-            return false;
-        }
-    }
-
-    public function get_characters_count(string $string, int $realmId)
-    {
-        $realm = $this->realms->getRealm($realmId);
-
-        $this->c_connection = $realm->getCharacters()->getConnection();
-        
-        $string = $this->c_connection->escapeString($string);
-
-        return $this->c_connection->table(table("characters", $realmId))->like(column("characters", "name", false, $realmId), $string)->countAllResults();
+        $builder = $this->guildQuery($search, $realmId);
+        return $builder ? $builder->countAllResults() : 0;
     }
 }

@@ -20,7 +20,6 @@ class Armory extends MX_Controller
 
         $this->load->model('armory_model');
 
-        $this->load->library('form_validation');
 
         $this->weapon_sub = lang('weapon_sub', 'wow_tooltip');
         $this->armor_sub = lang('armor_sub', 'wow_tooltip');
@@ -30,6 +29,9 @@ class Armory extends MX_Controller
     public function index()
     {
         clientLang("search_too_short", "armory");
+        clientLang("search_failed", "armory");
+        clientLang("search_invalid", "armory");
+        clientLang("view_character_profile", "armory");
 
         $this->template->setTitle(lang("search_title", "armory"));
 
@@ -48,121 +50,37 @@ class Armory extends MX_Controller
     
     public function search()
     {
-        if (!$this->input->is_ajax_request()) {
-            die('No direct script access allowed');
+        $draw = PageBounds::offset($this->input->post('draw'));
+        $bounds = PageBounds::bounds($this->input->post('start') ?? 0, $this->input->post('length') ?? 10);
+        $realm = filter_var($this->input->post('realm'), FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]);
+        $type = $this->input->post('table');
+        // Search text is bound by the model and escaped when rendered, not rewritten as HTML.
+        $search = $this->input->post('search', false);
+        $search = is_string($search) ? trim($search) : '';
+        header('Content-Type: application/json; charset=utf-8');
+        if (!$this->input->is_ajax_request() || !$bounds || !$realm || !in_array($type, ['items', 'guilds', 'characters'], true)
+            || mb_strlen($search) < 3 || mb_strlen($search) > 100 || !$this->realms->realmExists($realm)) {
+            http_response_code(400);
+            die(json_encode(['draw' => $draw, 'recordsTotal' => 0, 'recordsFiltered' => 0, 'data' => [], 'error' => lang('search_invalid', 'armory')]));
         }
-
-        $this->form_validation->set_rules('realm', 'realm', 'trim|required|min_length[1]|max_length[3]|integer');
-        $this->form_validation->set_rules('table', 'table', 'trim|required|min_length[5]|max_length[10]|alpha_numeric');
-        $this->form_validation->set_rules('start', 'start', 'trim|max_length[4]|integer');
-        $this->form_validation->set_rules('length', 'length', 'trim|max_length[4]|integer');
-        $this->form_validation->set_rules('search', 'search', 'trim|required|min_length[3]|max_length[100]');
-
-        $this->form_validation->set_error_delimiters('', '');
-
-        if ($this->form_validation->run())
-        {
-            $realm = $this->input->post('realm');
-            $table = $this->input->post('table');
-            $start = $this->input->post('start');
-            $length = $this->input->post('length');
-            $string = $this->input->post("search");
-
-            $result = [];
-
-            switch ($table)
-            {
-                case 'items':
-                    $data = $this->armory_model->get_items($string, $length, $start, $realm);
-
-                    if ($data)
-                    {
-                        foreach ($data as $row)
-                        {
-                            $result[] = [
-                                'id' => $row['entry'],
-                                'name' => $row['name'],
-                                'level' => $row['ItemLevel'],
-                                'required' => $row['RequiredLevel'],
-                                'type' => $this->getItemType($row['InventoryType'], $row['class'], $row['subclass']),
-                                'quality' => $row['Quality'],
-                                'realm' => $realm,
-                                'icon' => $this->getIcon($row['entry'], $realm)
-                            ];
-                        }
-                    }
-
-                    $total = $this->armory_model->get_items_count($string, $realm);
-                    $output = [
-                        'draw' => $this->input->post('draw'),
-                        'recordsTotal' => $total,
-                        'recordsFiltered' => $total,
-                        'data' => $result
-                    ];
-
-                    die(json_encode($output));
-                case 'guilds':
-                    $data = $this->armory_model->get_guilds($string, $length, $start, $realm);
-
-                    if ($data)
-                    {
-                        foreach ($data as $row)
-                        {
-                            $result[] = [
-                                'id' => $row['guildid'],
-                                'name' => $row['name'],
-                                'members' => $row['GuildMemberCount'],
-                                'realm' => $realm,
-                                'ownerGuid' => $row['leaderguid'],
-                                'ownerName' => $row['leaderName']
-                            ];
-                        }
-                    }
-
-                    $total = $this->armory_model->get_guilds_count($string, $realm);
-                    $output = [
-                        'draw' => $this->input->post('draw'),
-                        'recordsTotal' => $total,
-                        'recordsFiltered' => $total,
-                        'data' => $result
-                    ];
-
-                    die(json_encode($output));
-                case 'characters':
-                    $data = $this->armory_model->get_characters($string, $length, $start, $realm);
-
-                    if ($data)
-                    {
-                        foreach ($data as $row)
-                        {
-                            $result[] = [
-                                'guid' => $row['guid'],
-                                'name' => $row['name'],
-                                'race' => $this->realms->getRealm($realm)->getCharacters()->getFaction($row['guid']),
-                                'gender' => $row['gender'],
-                                'class' => $row['class'],
-                                'level' => $row['level'],
-                                'avatar' => $this->realms->formatAvatarPath($row),
-                                'realm' => $realm
-                            ];
-                        }
-                    }
-
-                    $total = $this->armory_model->get_characters_count($string, $realm);
-                    $output = [
-                        'draw' => $this->input->post('draw'),
-                        'recordsTotal' => $total,
-                        'recordsFiltered' => $total,
-                        'data' => $result
-                    ];
-
-                    die(json_encode($output));
+        $total = $this->armory_model->{'get_' . $type . '_count'}($search, $realm);
+        $rows = $bounds[0] < $total ? $this->armory_model->{'get_' . $type}($search, $bounds[1], $bounds[0], $realm) : [];
+        $result = [];
+        foreach ($rows as $row) {
+            if ($type === 'items') {
+                $result[] = ['id' => $row['entry'], 'name' => $row['name'], 'level' => $row['ItemLevel'], 'required' => $row['RequiredLevel'],
+                    'type' => $this->getItemType($row['InventoryType'], $row['class'], $row['subclass']), 'quality' => $row['Quality'],
+                    'realm' => $realm, 'icon' => $this->getIcon($row['entry'], $realm)];
+            } elseif ($type === 'guilds') {
+                $result[] = ['id' => $row['guildid'], 'name' => $row['name'], 'members' => $row['GuildMemberCount'], 'realm' => $realm,
+                    'ownerGuid' => $row['leaderguid'], 'ownerName' => $row['leaderName']];
+            } else {
+                $result[] = ['guid' => $row['guid'], 'name' => $row['name'], 'race' => $this->realms->getFactionByRaceId((int) $row['race']),
+                    'gender' => $row['gender'], 'class' => $row['class'], 'level' => $row['level'],
+                    'avatar' => $this->realms->formatAvatarPath($row), 'realm' => $realm];
             }
         }
-        else
-        {
-            die(json_encode(['error' => validation_errors()]));
-        }
+        die(json_encode(['draw' => $draw, 'recordsTotal' => $total, 'recordsFiltered' => $total, 'data' => $result], JSON_INVALID_UTF8_SUBSTITUTE));
     }
 
     private function getIcon($id, $realm)

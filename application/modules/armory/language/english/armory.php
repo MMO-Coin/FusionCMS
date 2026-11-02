@@ -34,3 +34,6 @@
  $lang['view_character_profile'] = "View character profile";
  $lang['cant_be_empty'] = "Search field can't be empty!";
  $lang['misc'] = "Miscellaneous";
+$lang['search_invalid'] = 'Choose a realm and enter 3 to 100 characters.';
+$lang['search_failed'] = 'Unable to load results. Please try the search again.';
+$lang['search_type'] = 'Search for';

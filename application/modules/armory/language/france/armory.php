@@ -34,4 +34,6 @@
  $lang['view_character_profile'] = "Voir le profil du personnage";
  $lang['cant_be_empty'] = "Le champ de recherche ne peut pas être vide !";
  $lang['misc'] = "Divers";
- 
+$lang['search_invalid'] = 'Choisissez un royaume et saisissez de 3 à 100 caractères.';
+$lang['search_failed'] = 'Impossible de charger les résultats. Relancez la recherche.';
+$lang['search_type'] = 'Rechercher';

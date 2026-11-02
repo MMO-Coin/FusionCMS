@@ -34,3 +34,6 @@ $lang['type'] = "نوع";
 $lang['view_character_profile'] = "مشاهده پروفایل شخصیت";
 $lang['cant_be_empty'] = "فیلد جستجو نمی تواند خالی باشد!";
 $lang['misc'] = "متفرقه";
+$lang['search_invalid'] = 'یک قلمرو انتخاب کنید و ۳ تا ۱۰۰ نویسه بنویسید.';
+$lang['search_failed'] = 'نتایج بارگذاری نشدند. دوباره جستجو کنید.';
+$lang['search_type'] = 'جستجو در';

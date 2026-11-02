@@ -97,7 +97,7 @@ var Router = {
 					
 					try
 					{
-						data = JSON.parse(data);
+						data = typeof data === 'string' ? JSON.parse(data) : data;
 					}
 					catch(error)
 					{
@@ -110,6 +110,9 @@ var Router = {
 							language: false
 						};
 					}
+
+					// Admin plugins must be available before inline page scripts execute.
+					if (data.admin_assets) { window.location.assign(link); return; }
 
 					// Change the cursor back to normal
 					$("html").css("cursor", "default");

@@ -85,6 +85,15 @@ jobs:
     - name: Run CSRF HTTP regression tests
       run: php tests/security_csrf_test.php
 
+    - name: Run admin asset dependency checks
+      run: php tests/admin_assets_test.php
+
+    - name: Run Armory search and pagination regression tests
+      env:
+        FUSION_TEST_MYSQL_HOST: 127.0.0.1
+        FUSION_TEST_MYSQL_PASSWORD: fusion_test
+      run: php tests/armory_search_test.php
+
     - name: Run request throttling regression tests
       run: php tests/throttler_test.php
 

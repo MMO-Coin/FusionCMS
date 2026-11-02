@@ -92,6 +92,10 @@ Set `FUSION_E2E_OUTPUT_DIR` to an absolute path outside the checkout to keep rep
 
 ## Reports and failures
 
+Admin asset browser checks visit basic log pages, account search, the dashboard, the email editor, news uploads, module management, the theme carousel and store icons. They check working controls, missing dependencies and browser script errors on desktop and mobile. Basic pages must omit unrelated plugin bundles. `php tests/admin_assets_test.php` also checks dependency files and load order.
+
+Armory browser checks use a realm inside the owned disposable auth schema, with 125 characters, items and guilds. They cover page boundaries, literal wildcard searches, empty guilds, malformed requests, escaped result names and retry after a failed request. `php tests/armory_search_test.php` exercises the real query builder with Trinity and VMaNGOS column maps on SQLite and the optional loopback MySQL server. MySQL runs with `ONLY_FULL_GROUP_BY`; query checks verify one character query per page and member aggregation restricted to the current guild page.
+
 Open `output/playwright/report/index.html` for the HTML report. Failed tests retain screenshots, video and traces in `output/playwright/results`. PHP and RPC diagnostics are in `output/playwright/logs`. GitHub uploads those directories as a separate artifact for each PHP version, retained for seven days.
 
 The runtime manifest, generated configuration and ephemeral TLS private key are excluded from CI artifact uploads and Git. If the runner is forcibly terminated, its terminal output and temporary fixture configuration can help identify the remaining test resources; cleanup must still check fixture ownership before dropping a database.

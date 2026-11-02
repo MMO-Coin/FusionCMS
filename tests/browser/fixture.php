@@ -57,10 +57,11 @@ function assertOwner(mysqli $db, string $database, string $nonce): void {
 }
 function resetFixture(mysqli $db, array $config): void {
     $db->select_db($config['cms']);
-    foreach (['donate_mmo_transactions', 'monthly_income', 'failed_logins', 'remember_me_tokens', 'password_recovery_key', 'email_log', 'account_session_versions', 'account_totp_uses', 'account_sessions', 'private_message', 'comments', 'article_tag', 'articles'] as $table) $db->query("DELETE FROM `$table`");
+    foreach (['donate_mmo_transactions', 'monthly_income', 'failed_logins', 'remember_me_tokens', 'password_recovery_key', 'email_log', 'account_session_versions', 'account_totp_uses', 'account_sessions', 'private_message', 'comments', 'article_tag', 'articles', 'realms'] as $table) $db->query("DELETE FROM `$table`");
     $db->query('DELETE FROM account_data WHERE id > 3');
     $db->query('UPDATE account_data SET dp = 0, vp = 0');
     $db->select_db($config['auth']);
+    foreach (['characters', 'guild', 'guild_member', 'item_template'] as $table) $db->query("DELETE FROM `$table`");
     $db->query('DELETE FROM account WHERE id > 3');
     $db->query("UPDATE account SET sha_pass_hash = UPPER(SHA1(CONCAT(username, ':BROWSERTEST123'))), totp_secret = NULL, token_key = NULL");
     foreach (glob($config['root'] . '/site/writable/cache/throttle/*.json') as $file) unlink($file);
@@ -104,6 +105,10 @@ if ($action === 'setup') {
     $db->query('CREATE TABLE account_access (AccountId INT, SecurityLevel INT, RealmID INT DEFAULT -1)');
     $db->query('CREATE TABLE account_banned (id INT, banreason VARCHAR(255), active INT, bandate INT, unbandate INT, bannedby VARCHAR(50))');
     $db->query('CREATE TABLE ip_banned (ip VARCHAR(45), banreason VARCHAR(255), bandate INT, unbandate INT, bannedby VARCHAR(50))');
+    $db->query('CREATE TABLE characters (guid INT PRIMARY KEY, name VARCHAR(100), race INT, gender INT, class INT, level INT, online INT DEFAULT 0)');
+    $db->query('CREATE TABLE guild (guildid INT PRIMARY KEY, name VARCHAR(100), leaderguid INT)');
+    $db->query('CREATE TABLE guild_member (guildid INT, guid INT, INDEX (guildid))');
+    $db->query('CREATE TABLE item_template (entry INT PRIMARY KEY, name VARCHAR(100), ItemLevel INT, RequiredLevel INT, InventoryType INT, Quality INT, class INT, subclass INT)');
     foreach ([1 => 'E2EPLAYER', 2 => 'E2EOTHER', 3 => 'E2EOWNER'] as $id => $username) {
         $hash = strtoupper(sha1($username . ':BROWSERTEST123'));
         $email = strtolower($username) . '@example.invalid';
@@ -232,6 +237,29 @@ if ($action === 'cleanup') {
     $db->select_db($config['cms']);
     $row['claims'] = $db->query('SELECT * FROM account_totp_uses ORDER BY account_id, secret_hash')->fetch_all(MYSQLI_ASSOC);
     echo json_encode($row, JSON_THROW_ON_ERROR);
+} elseif ($action === 'seed-armory') {
+    $db->select_db($config['cms']);
+    $realm = $db->prepare('INSERT INTO realms (id, hostname, username, password, char_database, world_database, cap, expansion, realmName, emulator, realm_port, override_port_char, override_port_world) VALUES (1, ?, ?, ?, ?, ?, 100, 2, \'Browser Realm\', \'trinity\', 0, ?, ?)');
+    $realm->bind_param('sssssii', $config['dbHost'], $config['dbUser'], $config['dbPassword'], $config['auth'], $config['auth'], $config['dbPort'], $config['dbPort']); $realm->execute();
+    $db->select_db($config['auth']);
+    for ($id = 1; $id <= 125; $id++) {
+        $name = sprintf('Search%03d', $id);
+        $db->query("INSERT INTO characters VALUES ($id, '$name', 1, 0, 1, 60, 0)");
+        $leader = $id === 2 ? 9999 : 1;
+        $db->query("INSERT INTO guild VALUES ($id, '$name', $leader)");
+        if ($id !== 1) $db->query("INSERT INTO guild_member VALUES ($id, $id)");
+        $db->query("INSERT INTO item_template VALUES ($id, '$name', 60, 50, 13, 3, 2, 7)");
+    }
+    $character = $db->prepare('INSERT INTO characters VALUES (?, ?, 1, 0, 1, 60, 0)');
+    foreach (['Literal%Name', 'Literal_Name', "O'Name", '<b>Literal</b>', 'Percent%41Name'] as $i => $name) {
+        $id = 200 + $i; $character->bind_param('is', $id, $name); $character->execute();
+    }
+    require_once $site . '/application/libraries/ConfigEditor.php';
+    $editor = new ConfigEditor($site . '/application/config/fusion.php'); $editor->set('cache', true); $editor->save();
+    $folder = $site . '/writable/cache/data/items';
+    if (!is_dir($folder)) mkdir($folder, 0777, true);
+    for ($id = 1; $id <= 125; $id++) file_put_contents($folder . '/item_1_' . $id . '.cache', json_encode(['expiration' => time() + 3600, 'content' => ['icon' => 'inv_misc_questionmark']]));
+    echo 'Seeded the owned Armory realm fixture.';
 } elseif ($action === 'seed-public-lists') {
     require_once $site . '/application/libraries/ConfigEditor.php';
     $db->select_db($config['cms']);

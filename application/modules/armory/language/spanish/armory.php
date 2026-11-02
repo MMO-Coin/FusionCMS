@@ -34,3 +34,6 @@ $lang['type'] = "Tipo";
 $lang['view_character_profile'] = "Ver Perfil del Personaje";
 $lang['cant_be_empty'] = "el campo de busqueda no puede esta vacio!";
 $lang['misc'] = "Varios";
+$lang['search_invalid'] = 'Elige un reino y escribe entre 3 y 100 caracteres.';
+$lang['search_failed'] = 'No se pudieron cargar los resultados. Repite la búsqueda.';
+$lang['search_type'] = 'Buscar';

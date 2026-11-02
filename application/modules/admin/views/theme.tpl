@@ -4,7 +4,7 @@
 			
 			function checkForTheme()
 			{
-				if(typeof Theme != "undefined")
+				if(typeof Theme != "undefined" && typeof Theme.scroll === "function" && typeof $.fn.transition === "function")
 				{
 					Theme.scroll({$id});
 				}

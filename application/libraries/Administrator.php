@@ -36,6 +36,13 @@ class Administrator
     private array $menu;
     private string $title;
     private string $currentPage;
+    private array $requiredAssets = [];
+
+    /** Declare plugins used by an external module script. */
+    public function requireAssets(array $groups): void
+    {
+        $this->requiredAssets = array_values(array_unique(array_merge($this->requiredAssets, $groups)));
+    }
 
     /**
      * Define our paths and objects
@@ -252,15 +259,21 @@ class Administrator
      */
     public function view(string $content, bool|string $css = false, bool|string $js = false)
     {
+        require_once __DIR__ . '/AdminAssets.php';
+        $assets = AdminAssets::forContent($content, $this->requiredAssets);
         if ($this->input->is_ajax_request() && $this->input->get('is_json_ajax') == 1) {
             $array = [
                 "title" => ($this->title) ? $this->title : "",
                 "content" => $content,
                 "js" => $js,
-                "css" => $css
+                "css" => $css,
+                "admin_assets" => $assets
             ];
 
-            return json_encode($array);
+            header('Content-Type: application/json; charset=utf-8');
+            $json = json_encode($array);
+            $this->CI->output->set_output($json);
+            return $json;
         }
 
         $menu = $this->menu;
@@ -288,6 +301,7 @@ class Administrator
             "title" => $this->title,
             "extra_js" => $js,
             "extra_css" => $css,
+            "admin_assets" => $assets,
             "nickname" => $this->user->getNickname(),
             "current_page" => $this->currentPage,
             "defaultLanguage" => $this->config->item('language'),
