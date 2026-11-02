@@ -1,0 +1,24 @@
+services:
+  cms:
+    depends_on:
+      db:
+        condition: service_healthy
+  db:
+    image: mariadb:11.4
+    restart: unless-stopped
+    environment:
+      MARIADB_DATABASE: "${FUSION_DB_NAME:-fusioncms}"
+      MARIADB_USER: "${FUSION_DB_USER:-fusioncms}"
+      MARIADB_PASSWORD: "${FUSION_DB_PASSWORD:?Set FUSION_DB_PASSWORD in docker/.env}"
+      MARIADB_ROOT_PASSWORD: "${FUSION_DB_ROOT_PASSWORD:?Set FUSION_DB_ROOT_PASSWORD in docker/.env}"
+    volumes:
+      - database:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+      start_period: 30s
+
+volumes:
+  database:

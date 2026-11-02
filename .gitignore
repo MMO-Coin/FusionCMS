@@ -18,3 +18,6 @@ install/.lock
 /.idea/
 /tests/browser/node_modules/
 /output/playwright/
+/output/docker/
+/docker/.env
+/backup/

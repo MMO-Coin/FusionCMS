@@ -21,6 +21,7 @@
 * [About the Project](#about-the-project)
 * [Getting Started](#getting-started)
     * [Prerequisites](#prerequisites)
+    * [Optional Docker Compose installation](#optional-docker-compose-installation)
     * [Security Tips](#security-tips)
 * [Contributing](#contributing)
 * [License](#license)
@@ -97,6 +98,12 @@ These PHP minimums include the fixes for [CVE-2026-109618 and CVE-2026-109619](h
 ### Security Tips
 > [!IMPORTANT]
 > Read the [Security Tips](SECURITY.md).
+
+### Optional Docker Compose installation
+
+You can also run FusionCMS with Docker Compose and complete setup through the existing web installer. Use an external CMS database or the optional MariaDB container. Configuration, uploads and database data persist across container replacements. Normal installations do not need Docker.
+
+See the [Docker installation, backup and update guide](../docs/docker.md).
 
 ## Contributing
 

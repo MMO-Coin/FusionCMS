@@ -1,0 +1,28 @@
+name: Optional Docker installation
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths: ['Dockerfile', '.dockerignore', '.gitattributes', '.htaccess', 'index.php', 'compose*.yaml', 'docker/**', 'application/**', 'system/**', 'node_modules/**', 'package*.json', 'composer.*', 'tests/docker/**', 'tests/docker_state_test.php', '.github/workflows/docker.yml']
+  pull_request:
+    paths: ['Dockerfile', '.dockerignore', '.gitattributes', '.htaccess', 'index.php', 'compose*.yaml', 'docker/**', 'application/**', 'system/**', 'node_modules/**', 'package*.json', 'composer.*', 'tests/docker/**', 'tests/docker_state_test.php', '.github/workflows/docker.yml']
+
+permissions:
+  contents: read
+
+jobs:
+  docker:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '24'
+      - name: Build image and test installer with bundled MariaDB
+        run: node tests/docker/smoke.cjs
+      - name: Test installer with external CMS and auth databases
+        run: node tests/docker/smoke.cjs --external
+      - name: Check state upgrades and Linux symlinks
+        run: docker run --rm -v "$PWD:/tests:ro" fusioncms:local php /tests/tests/docker_state_test.php

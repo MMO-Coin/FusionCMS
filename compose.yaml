@@ -1,0 +1,33 @@
+services:
+  cms:
+    build: .
+    image: fusioncms:local
+    restart: unless-stopped
+    ports:
+      - "${FUSION_BIND_ADDRESS:-127.0.0.1}:${FUSION_HTTP_PORT:-8080}:80"
+    environment:
+      CI_ENVIRONMENT: production
+      TZ: "${TZ:-UTC}"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    volumes:
+      - type: volume
+        source: config
+        target: /var/www/html/application/config
+        volume:
+          nocopy: true
+      - type: volume
+        source: writable
+        target: /var/www/html/writable
+        volume:
+          nocopy: true
+      - type: volume
+        source: settings
+        target: /var/lib/fusioncms
+        volume:
+          nocopy: true
+
+volumes:
+  config:
+  writable:
+  settings:

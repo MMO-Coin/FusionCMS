@@ -1,0 +1,36 @@
+services:
+  cms:
+    depends_on:
+      authdb:
+        condition: service_healthy
+  authdb:
+    image: mariadb:11.4
+    environment:
+      MARIADB_DATABASE: fusion_auth
+      MARIADB_ROOT_PASSWORD: "${FUSION_DB_ROOT_PASSWORD}"
+    volumes:
+      - authdata:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      interval: 2s
+      timeout: 5s
+      retries: 60
+  external-db:
+    profiles: [external]
+    image: mariadb:11.4
+    environment:
+      MARIADB_DATABASE: "${FUSION_DB_NAME}"
+      MARIADB_USER: "${FUSION_DB_USER}"
+      MARIADB_PASSWORD: "${FUSION_DB_PASSWORD}"
+      MARIADB_ROOT_PASSWORD: "${FUSION_DB_ROOT_PASSWORD}"
+    volumes:
+      - externaldata:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      interval: 2s
+      timeout: 5s
+      retries: 60
+
+volumes:
+  authdata:
+  externaldata:

@@ -1,0 +1,33 @@
+.git
+.github
+.agents
+.codex
+.aws
+.playwright-cli
+.env
+.env.*
+**/.env
+**/.env.*
+!docker/.env.example
+vendor
+output
+backup
+tests
+docs
+writable
+temp
+*.log
+*.sql
+*.zip
+*.tar
+*.gz
+*.bak
+# Installer SQL and module migrations are part of the application.
+!application/**/*.sql
+application/config/Database.php
+application/config/database.php
+application/config/fusion.php
+application/config/owner.php
+**/node_modules/.cache
+**/node_modules/.package-lock.json
+# Frontend dependencies are shipped in this repository and used directly by the CMS.
