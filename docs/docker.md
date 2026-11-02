@@ -1,5 +1,7 @@
 # Install with Docker Compose
 
+New to Docker? Start with the [Windows, macOS and Linux setup guide](docker-quickstart.md). This page covers database networking, persistence, backups and updates in more detail.
+
 Docker Compose is an optional way to run FusionCMS. It uses the existing web installer. Normal Apache, Nginx and shared-hosting installations work as before and do not need Docker.
 
 The CMS image includes Apache, PHP 8.3, the required PHP extensions and Composer dependencies. You still need an existing WoW server with reachable auth, characters and world databases. This setup does not install a game server. Swarm and multiple CMS replicas are outside this setup's scope.
@@ -7,6 +9,8 @@ The CMS image includes Apache, PHP 8.3, the required PHP extensions and Composer
 ## Before you start
 
 Use Docker Engine or Docker Desktop in Linux container mode, with Docker Compose v2.24 or newer. On Windows, Docker Desktop needs its Linux backend running. Run commands from the repository root.
+
+Both guides use the project name `fusioncms` with `-p fusioncms`. If you already installed under a different name, use that original name in every command instead. `docker compose ls` lists existing projects.
 
 Build from a clean source checkout. The build excludes local database credentials, `fusion.php`, `owner.php`, `.env` files, uploads and backups. Other tracked files, including SMTP and module configuration, are part of the image. Keep production secrets out of the source checkout used for builds.
 
@@ -25,7 +29,7 @@ The default address is `http://localhost:8080`. The port binds to loopback, so y
 Create an empty CMS database and a database user with the permissions needed to create and update its tables. Then run:
 
 ```sh
-docker compose --env-file docker/.env up -d --build --wait
+docker compose -p fusioncms --env-file docker/.env up -d --build --wait
 ```
 
 Open `http://localhost:8080` and complete the normal installer. Enter your existing database hosts, ports and credentials. The database password fields in `docker/.env` can stay empty for this method.
@@ -35,7 +39,7 @@ Open `http://localhost:8080` and complete the normal installer. Enter your exist
 Set separate, long random values for `FUSION_DB_PASSWORD` and `FUSION_DB_ROOT_PASSWORD` in `docker/.env`. The example uses single quotes so passwords containing `$` or `#` keep their literal values.
 
 ```sh
-docker compose --env-file docker/.env -f compose.yaml -f compose.database.yaml up -d --build --wait
+docker compose -p fusioncms --env-file docker/.env -f compose.yaml -f compose.database.yaml up -d --build --wait
 ```
 
 Open `http://localhost:8080` and enter these CMS database settings:
@@ -103,12 +107,12 @@ Stop CMS writes before taking the backup:
 
 ```sh
 mkdir backup
-docker compose --env-file docker/.env -f compose.yaml -f compose.database.yaml stop cms
-docker compose --env-file docker/.env -f compose.yaml -f compose.database.yaml exec -T db sh -c 'MYSQL_PWD="$MARIADB_PASSWORD" mariadb-dump -u"$MARIADB_USER" --single-transaction --routines --triggers "$MARIADB_DATABASE" > /tmp/fusioncms-backup.sql'
-docker compose --env-file docker/.env -f compose.yaml -f compose.database.yaml cp db:/tmp/fusioncms-backup.sql backup/cms.sql
-docker compose --env-file docker/.env -f compose.yaml -f compose.database.yaml run --rm --no-deps --entrypoint sh -v "${PWD}/backup:/backup" cms -c 'tar -czf /backup/config.tar.gz -C /var/www/html/application/config . && tar -czf /backup/writable.tar.gz -C /var/www/html/writable . && tar -czf /backup/settings.tar.gz -C /var/lib/fusioncms .'
-docker compose --env-file docker/.env -f compose.yaml -f compose.database.yaml exec -T db rm /tmp/fusioncms-backup.sql
-docker compose --env-file docker/.env -f compose.yaml -f compose.database.yaml start cms
+docker compose -p fusioncms --env-file docker/.env -f compose.yaml -f compose.database.yaml stop cms
+docker compose -p fusioncms --env-file docker/.env -f compose.yaml -f compose.database.yaml exec -T db sh -c 'MYSQL_PWD="$MARIADB_PASSWORD" mariadb-dump -u"$MARIADB_USER" --single-transaction --routines --triggers "$MARIADB_DATABASE" > /tmp/fusioncms-backup.sql'
+docker compose -p fusioncms --env-file docker/.env -f compose.yaml -f compose.database.yaml cp db:/tmp/fusioncms-backup.sql backup/cms.sql
+docker compose -p fusioncms --env-file docker/.env -f compose.yaml -f compose.database.yaml run --rm --no-deps --entrypoint sh -v "${PWD}/backup:/backup" cms -c 'tar -czf /backup/config.tar.gz -C /var/www/html/application/config . && tar -czf /backup/writable.tar.gz -C /var/www/html/writable . && tar -czf /backup/settings.tar.gz -C /var/lib/fusioncms .'
+docker compose -p fusioncms --env-file docker/.env -f compose.yaml -f compose.database.yaml exec -T db rm /tmp/fusioncms-backup.sql
+docker compose -p fusioncms --env-file docker/.env -f compose.yaml -f compose.database.yaml start cms
 ```
 
 For an external CMS database, use that server's database backup tools and omit the `db` commands. Save a private copy of `docker/.env`, your Compose overrides, the source revision and custom source files alongside the backup.
@@ -116,13 +120,13 @@ For an external CMS database, use that server's database backup tools and omit t
 Restore into a separate project first. Build its image from the saved source revision, keep `cms` stopped, and restore the archives:
 
 ```sh
-docker compose --env-file docker/.env -f compose.yaml -f compose.database.yaml build cms
-docker compose --env-file docker/.env -f compose.yaml -f compose.database.yaml run --rm --no-deps --entrypoint sh -v "${PWD}/backup:/backup:ro" cms -c 'tar -xzf /backup/config.tar.gz -C /var/www/html/application/config && tar -xzf /backup/writable.tar.gz -C /var/www/html/writable && tar -xzf /backup/settings.tar.gz -C /var/lib/fusioncms'
-docker compose --env-file docker/.env -f compose.yaml -f compose.database.yaml up -d --wait db
-docker compose --env-file docker/.env -f compose.yaml -f compose.database.yaml cp backup/cms.sql db:/tmp/fusioncms-restore.sql
-docker compose --env-file docker/.env -f compose.yaml -f compose.database.yaml exec -T db sh -c 'MYSQL_PWD="$MARIADB_PASSWORD" mariadb -u"$MARIADB_USER" "$MARIADB_DATABASE" < /tmp/fusioncms-restore.sql'
-docker compose --env-file docker/.env -f compose.yaml -f compose.database.yaml exec -T db rm /tmp/fusioncms-restore.sql
-docker compose --env-file docker/.env -f compose.yaml -f compose.database.yaml up -d --wait cms
+docker compose -p fusioncms --env-file docker/.env -f compose.yaml -f compose.database.yaml build cms
+docker compose -p fusioncms --env-file docker/.env -f compose.yaml -f compose.database.yaml run --rm --no-deps --entrypoint sh -v "${PWD}/backup:/backup:ro" cms -c 'tar -xzf /backup/config.tar.gz -C /var/www/html/application/config && tar -xzf /backup/writable.tar.gz -C /var/www/html/writable && tar -xzf /backup/settings.tar.gz -C /var/lib/fusioncms'
+docker compose -p fusioncms --env-file docker/.env -f compose.yaml -f compose.database.yaml up -d --wait db
+docker compose -p fusioncms --env-file docker/.env -f compose.yaml -f compose.database.yaml cp backup/cms.sql db:/tmp/fusioncms-restore.sql
+docker compose -p fusioncms --env-file docker/.env -f compose.yaml -f compose.database.yaml exec -T db sh -c 'MYSQL_PWD="$MARIADB_PASSWORD" mariadb -u"$MARIADB_USER" "$MARIADB_DATABASE" < /tmp/fusioncms-restore.sql'
+docker compose -p fusioncms --env-file docker/.env -f compose.yaml -f compose.database.yaml exec -T db rm /tmp/fusioncms-restore.sql
+docker compose -p fusioncms --env-file docker/.env -f compose.yaml -f compose.database.yaml up -d --wait cms
 ```
 
 The restored CMS connection file must match the restored database credentials and reachable hostnames. Check login, uploads and realm connections before moving traffic to the restored site.
@@ -132,9 +136,9 @@ The restored CMS connection file must match the restored database credentials an
 Take a backup, update the clean build checkout, then rebuild and replace the CMS container:
 
 ```sh
-docker compose --env-file docker/.env -f compose.yaml -f compose.database.yaml build --pull cms
-docker compose --env-file docker/.env -f compose.yaml -f compose.database.yaml up -d --no-deps --force-recreate --wait cms
-docker compose --env-file docker/.env -f compose.yaml -f compose.database.yaml logs --tail=100 cms
+docker compose -p fusioncms --env-file docker/.env -f compose.yaml -f compose.database.yaml build --pull cms
+docker compose -p fusioncms --env-file docker/.env -f compose.yaml -f compose.database.yaml up -d --no-deps --force-recreate --wait cms
+docker compose -p fusioncms --env-file docker/.env -f compose.yaml -f compose.database.yaml logs --tail=100 cms
 ```
 
 The PHP image follows the current 8.3 Apache Bookworm tag. Composer checks that the PHP version meets this repository's minimum. Rebuild with `--pull` to pick up base image security releases. Keep MariaDB on the 11.4 branch unless you have planned and tested a database upgrade.

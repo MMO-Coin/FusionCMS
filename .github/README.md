@@ -25,7 +25,7 @@
     * [Security Tips](#security-tips)
 * [Contributing](#contributing)
 * [License](#license)
-* [Authors](#authors)
+* [Authors & Contributors](#authors--contributors)
 
 ## About The Project
 
@@ -78,13 +78,16 @@ its ease of use and development, safe and secure codebase and dedication to simp
 [Releases for this fork](https://github.com/MMO-Coin/FusionCMS/releases)
 
 ### Installation
-Read the [Installation Guide](https://github.com/FusionWowCMS/FusionCMS/wiki/Installation-Guide).
+
+For Docker, follow the [Windows, macOS and Linux setup guide](../docs/docker-quickstart.md). For a manual installation, read the [Installation Guide](https://github.com/FusionWowCMS/FusionCMS/wiki/Installation-Guide).
 
 For this fork's existing-site migrations and rollback steps, read [UPGRADING.md](../UPGRADING.md). Changes are listed in the [changelog](../CHANGELOG.md).
 
 For the repeatable login and donation browser tests, see the [browser test guide](../docs/testing/browser-ci.md). CI runs these flows at desktop and mobile sizes with disposable databases and a local RPC fixture.
 
 ### Prerequisites
+
+The Docker image supplies PHP and the web server. For a manual installation, prepare the following:
 
 | Requirements                           | Description                                                                                |
 |----------------------------------------|--------------------------------------------------------------------------------------------|
@@ -103,7 +106,9 @@ These PHP minimums include the fixes for [CVE-2026-109618 and CVE-2026-109619](h
 
 You can also run FusionCMS with Docker Compose and complete setup through the existing web installer. Use an external CMS database or the optional MariaDB container. Configuration, uploads and database data persist across container replacements. Normal installations do not need Docker.
 
-See the [Docker installation, backup and update guide](../docs/docker.md).
+Start with the [Docker setup guide for Windows, macOS and Linux](../docs/docker-quickstart.md). It covers installing Docker, starting FusionCMS and completing the web installer with either database option.
+
+For backups, restores, custom networks and updates, see the [Docker operations guide](../docs/docker.md).
 
 ## Contributing
 
