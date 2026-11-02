@@ -136,7 +136,9 @@ process.on('SIGINT', () => stop().then(() => process.exit(0), error => {console.
     // The manifest stays outside the served site and is excluded from uploaded CI artifacts.
     fs.writeFileSync(manifest, JSON.stringify({root, configPath, scenarioPath, mailPath, php, rpcUrl: config.rpcUrl, nonce: config.nonce}), {mode: 0o600});
     phpLog = fs.createWriteStream(path.join(output, 'logs/php.log'), {flags: 'w'});
-    child = spawn(php, ['-d', `curl.cainfo=${path.join(root, 'rpc-cert.pem')}`, '-d', 'memory_limit=512M', '-S', `127.0.0.1:${port}`, '-t', site, path.join(site, 'router.php')], {
+    // Fixtures rewrite PHP configuration between requests, including 2FA storage modes.
+    // Read those edits immediately instead of reusing compiled configuration from OPcache.
+    child = spawn(php, ['-d', 'opcache.enable=0', '-d', `curl.cainfo=${path.join(root, 'rpc-cert.pem')}`, '-d', 'memory_limit=512M', '-S', `127.0.0.1:${port}`, '-t', site, path.join(site, 'router.php')], {
         cwd: site, env: {...process.env, CI_ENVIRONMENT: 'production'}, windowsHide: true, stdio: ['ignore', 'pipe', 'pipe'],
     });
     child.stdout.pipe(phpLog, {end: false}); child.stderr.pipe(phpLog, {end: false});
