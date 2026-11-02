@@ -108,7 +108,7 @@ if ($action === 'setup') {
     $db->query('CREATE TABLE ip_banned (ip VARCHAR(45), banreason VARCHAR(255), bandate INT, unbandate INT, bannedby VARCHAR(50))');
     $db->query('CREATE TABLE characters (guid INT PRIMARY KEY, name VARCHAR(100), race INT, gender INT, class INT, level INT, online INT DEFAULT 0, account INT DEFAULT 1)');
     $db->query('CREATE TABLE guild (guildid INT PRIMARY KEY, name VARCHAR(100), leaderguid INT, motd TEXT, info TEXT, createdate INT)');
-    $db->query('CREATE TABLE guild_member (guildid INT, guid INT, rank INT DEFAULT 0, INDEX (guildid))');
+    $db->query('CREATE TABLE guild_member (guildid INT, guid INT, `rank` INT DEFAULT 0, INDEX (guildid))');
     $db->query('CREATE TABLE guild_rank (guildid INT, rid INT, rname VARCHAR(60), rights INT)');
     $db->query('CREATE TABLE item_template (entry INT PRIMARY KEY, name VARCHAR(100), ItemLevel INT, RequiredLevel INT, InventoryType INT, Quality INT, class INT, subclass INT)');
     foreach ([1 => 'E2EPLAYER', 2 => 'E2EOTHER', 3 => 'E2EOWNER'] as $id => $username) {

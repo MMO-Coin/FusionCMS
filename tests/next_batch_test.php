@@ -94,7 +94,7 @@ namespace {
             $gid = column('guild_member', 'guildid');
             $rankId = $emulator === 'Trinity' ? 'rid' : 'id'; $rankName = $emulator === 'Trinity' ? 'rname' : 'name';
             $db->query('CREATE TABLE characters (guid INT PRIMARY KEY, name VARCHAR(60), race INT, class INT, gender INT, level INT)');
-            $db->query("CREATE TABLE guild_member ($gid INT, guid INT, rank INT)");
+            $db->query("CREATE TABLE guild_member ($gid INT, guid INT, `rank` INT)");
             $db->query("CREATE TABLE guild_rank ($gid INT, $rankId INT, $rankName VARCHAR(40), rights INT)");
             $db->query("INSERT INTO guild_rank VALUES (1, 0, 'Member', 1)");
             for ($id = 1; $id <= 125; $id++) { $db->query("INSERT INTO characters VALUES ($id, 'Hero$id', 1, 1, 0, 60)"); $db->query("INSERT INTO guild_member VALUES (1, $id, 0)"); }
