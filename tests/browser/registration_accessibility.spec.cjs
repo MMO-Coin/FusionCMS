@@ -2,7 +2,10 @@ const {test, expect, openPage} = require('./helpers.cjs');
 const {requestLink, reset} = require('./recovery-helpers.cjs');
 
 test('registration accepts email aliases and long domains and shows linked text errors', async ({page}) => {
+    const errors = [];
+    page.on('pageerror', error => errors.push(error.message));
     await openPage(page, '/register');
+    await page.waitForFunction(() => typeof jQuery.ajaxSettings.beforeSend === 'function');
     const email = page.getByLabel('Email', {exact: true});
     await expect(email).toHaveAttribute('autocomplete', 'email');
     for (const address of ['player+wow@example.com', 'player@example.technology']) {
@@ -32,6 +35,7 @@ test('registration accepts email aliases and long domains and shows linked text 
     await page.getByLabel('Confirm password', {exact: true}).fill('BrowserTest123');
     await page.getByRole('button', {name: 'Create account!', exact: true}).click();
     await expect(page.getByTitle('Your account has been created!', {exact: true})).toBeVisible();
+    expect(errors).toEqual([]);
 });
 
 test('recovery has linked fields, keyboard controls and a retry after a network failure', async ({page, baseURL}) => {

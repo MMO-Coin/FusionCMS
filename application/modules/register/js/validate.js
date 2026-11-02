@@ -11,7 +11,9 @@ var Validate = {
         var value = $(field).val(), key = field;
         if (this.requests[key]) this.requests[key].abort();
         this.message(field, lang('validation_checking', 'register'), false);
-        this.requests[key] = $.ajax({url: Config.URL + url, method: data ? 'POST' : 'GET', data: data}).done(function(result) {
+        var options = {url: Config.URL + url, method: data ? 'POST' : 'GET'};
+        if (data) options.data = data;
+        this.requests[key] = $.ajax(options).done(function(result) {
             if ($(field).val() !== value) return;
             result = String(result).trim();
             if (result === '1') Validate.valid(field);

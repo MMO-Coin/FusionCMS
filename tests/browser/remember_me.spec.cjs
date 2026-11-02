@@ -1,5 +1,5 @@
 const {createHash} = require('node:crypto');
-const {test, expect, login, openPage, blockExternal, fixture} = require('./helpers.cjs');
+const {test, expect, login, openPage, blockExternal, fixture, verify} = require('./helpers.cjs');
 const {requestLink, reset} = require('./recovery-helpers.cjs');
 
 function remembered() { return JSON.parse(fixture('remembered')); }
@@ -111,7 +111,8 @@ test('password recovery revokes all remembered devices without affecting another
         const recoveryPage = await recovery.newPage();
         const link = await requestLink(recoveryPage, baseURL);
         await openPage(recoveryPage, link.href);
-        expect((await reset(recoveryPage, 'short')).error).toBeTruthy();
+        const invalid = await verify(recoveryPage, '/password_recovery/reset_password', {token: link.searchParams.get('token'), new_password: 'short'});
+        expect((await invalid.json()).messages.error).toBeTruthy();
         await allowed(page);
         await allowed(second.pages()[0]);
         const oldSession = (await context.cookies()).filter(cookie => cookie.name === 'fusion_session');
