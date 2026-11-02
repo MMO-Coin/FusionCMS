@@ -34,6 +34,7 @@ namespace {
             'guild_member' => ['guildid', 'guid'], 'item_template' => ['entry', 'name', 'ItemLevel', 'RequiredLevel', 'InventoryType', 'Quality', 'class', 'subclass']];
         foreach ($fields as $name => $names) {
             $definitions = array_map(fn($field) => column($name, $field) . ($field === 'name' ? ' VARCHAR(150)' : ' INT'), $names);
+            if ($name === 'item_template') $definitions[] = 'PRIMARY KEY (' . column($name, 'entry') . ')';
             $db->query('CREATE TABLE ' . table($name) . ' (' . implode(', ', $definitions) . ')');
         }
         $insert = function($name, $row) use ($db) {
@@ -49,7 +50,21 @@ namespace {
         }
         foreach (['Literal%Name', 'Literal_Name', 'Literal!Name', "O'Name", 'MiXeD Name'] as $i => $name) {
             $insert('characters', ['guid' => 200 + $i, 'name' => $name, 'race' => 1, 'gender' => 0, 'class' => 1, 'level' => 1]);
+            $insert('item_template', ['entry' => 200 + $i, 'name' => $name, 'ItemLevel' => 10 + $i, 'RequiredLevel' => $i, 'InventoryType' => 13, 'Quality' => 2, 'class' => 2, 'subclass' => 7]);
         }
+        $itemFixtures = [];
+        for ($id = 300; $id < 323; $id++) {
+            $item = ['entry' => $id, 'name' => ($id % 2 ? 'AncientRelic ' : 'Relic ') . $id,
+                'ItemLevel' => [75, 50, 100][$id % 3], 'RequiredLevel' => $id % 60,
+                'InventoryType' => $id % 20, 'Quality' => $id % 5, 'class' => $id % 8, 'subclass' => $id % 10];
+            $itemFixtures[] = $item;
+            $insert('item_template', $item);
+        }
+        usort($itemFixtures, fn($a, $b) => ($b['ItemLevel'] <=> $a['ItemLevel']) ?: ($a['entry'] <=> $b['entry']));
+        $normalizeItem = function(array $row): array {
+            foreach (['entry', 'ItemLevel', 'RequiredLevel', 'InventoryType', 'Quality', 'class', 'subclass'] as $field) $row[$field] = (int) $row[$field];
+            return $row;
+        };
         $realm = new class($db) {
             public int $expansion = 2;
             public int $worldConnections = 0;
@@ -81,6 +96,27 @@ namespace {
             checkArmory(count($rows) === $model->get_characters_count($term, 1), "$emulator count and rows agree for $term");
             if ($term !== 'mixed') checkArmory(count($rows) === ($term === "' OR 1=1 --" ? 0 : 1), "$emulator binds literal search $term");
         }
+        foreach (['Literal%', 'Literal_', 'Literal!', "O'Name", "' OR 1=1 --", 'mixed'] as $term) {
+            $items = $model->get_items($term, 100, 0, 1);
+            $count = $model->get_items_count($term, 1);
+            checkArmory(count($items) === $count && $count === $model->get_characters_count($term, 1), "$emulator item search preserves literal and case matching for $term");
+        }
+        checkArmory($model->get_items_count('Relic', 1) === 23 && $model->get_items_count('entRelic', 1) === 11, "$emulator item search retains interior matches");
+        foreach ([0, 10, 20, 23] as $offset) {
+            $items = array_map($normalizeItem, $model->get_items('Relic', 10, $offset, 1));
+            checkArmory($items === array_slice($itemFixtures, $offset, 10), "$emulator item page $offset preserves every field and mixed-level ordering");
+        }
+        checkArmory(array_map($normalizeItem, $model->get_items('  Relic  ', 100, 0, 1)) === $itemFixtures, "$emulator trimmed item searches preserve the complete result");
+        $changed = $itemFixtures[array_key_last($itemFixtures)];
+        $changed['name'] = 'Fresh Relic'; $changed['ItemLevel'] = 999; $changed['Quality'] = 5;
+        $db->table(table('item_template'))->where(column('item_template', 'entry'), $changed['entry'])->update([
+            column('item_template', 'name') => $changed['name'], column('item_template', 'ItemLevel') => $changed['ItemLevel'],
+            column('item_template', 'Quality') => $changed['Quality']]);
+        $freshItems = array_map($normalizeItem, $model->get_items('Relic', 10, 0, 1));
+        checkArmory($freshItems[0] === $changed && $model->get_items_count('Relic', 1) === 23, "$emulator item page reads fresh fields and updated sort order");
+        \CodeIgniter\Events\Events::$queries = [];
+        $model->get_items('Relic', 10, 10, 1);
+        checkArmory(count(\CodeIgniter\Events\Events::$queries) === 1, "$emulator item pages use one query");
         \CodeIgniter\Events\Events::$queries = [];
         $model->get_characters('Search', 10, 0, 1);
         checkArmory(count(\CodeIgniter\Events\Events::$queries) === 1, "$emulator character pages use one query");

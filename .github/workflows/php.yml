@@ -104,6 +104,7 @@ jobs:
       run: |
         mkdir -p output/playwright
         php tests/armory_profile.php --rows=1000 --iterations=3 --output=output/playwright/armory-profile.json
+        php tests/armory_profile.php --rows=1000 --iterations=3 --item-padding=2048 --item-name-index=0 --output=output/playwright/armory-items-wide.json
 
     - name: Run request throttling regression tests
       run: php tests/throttler_test.php
@@ -195,6 +196,7 @@ jobs:
         name: browser-php-${{ matrix.php }}
         path: |
           output/playwright/armory-profile.json
+          output/playwright/armory-items-wide.json
           output/playwright/report/
           output/playwright/results/
           output/playwright/logs/

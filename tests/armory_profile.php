@@ -55,7 +55,7 @@ namespace {
         $db->query('SET SESSION query_cache_type = OFF');
         return 'OFF for profiling session';
     }
-    function seedProfile($db, int $rows): array {
+    function seedProfile($db, int $rows, int $itemPadding, bool $itemNameIndex): array {
         $fields = ['characters' => ['guid', 'name', 'race', 'gender', 'class', 'level'],
             'guild' => ['guildid', 'name', 'leaderguid'], 'guild_member' => ['guildid', 'guid'],
             'item_template' => ['entry', 'name', 'ItemLevel', 'RequiredLevel', 'InventoryType', 'Quality', 'class', 'subclass']];
@@ -64,7 +64,8 @@ namespace {
             $definitions = array_map(fn($field) => identifier(column($name, $field)) . ($field === 'name' ? ' VARCHAR(150) NOT NULL' : ' INT UNSIGNED NOT NULL'), $names);
             $primary = match ($name) { 'characters' => ['guid'], 'guild' => ['guildid'], 'guild_member' => ['guildid', 'guid'], default => ['entry'] };
             $definitions[] = 'PRIMARY KEY (' . implode(',', array_map(fn($field) => identifier(column($name, $field)), $primary)) . ')';
-            if ($name !== 'guild_member') $definitions[] = 'KEY idx_profile_name (' . identifier(column($name, 'name')) . ')';
+            if ($name === 'item_template' && $itemPadding) $definitions[] = 'profile_padding VARBINARY(' . $itemPadding . ') NOT NULL';
+            if ($name !== 'guild_member' && ($name !== 'item_template' || $itemNameIndex)) $definitions[] = 'KEY idx_profile_name (' . identifier(column($name, 'name')) . ')';
             $ddl[$name] = 'CREATE TABLE ' . identifier(table($name)) . ' (' . implode(',', $definitions) . ') ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci';
             $db->query($ddl[$name]);
         }
@@ -82,6 +83,8 @@ namespace {
                     $row = []; foreach ($record as $field => $value) $row[column($name, $field)] = $value;
                     return $row;
                 }, $records);
+                if ($name === 'item_template' && $itemPadding) foreach ($mapped as &$record) $record['profile_padding'] = str_repeat('p', $itemPadding);
+                unset($record);
                 if ($mapped) $db->table(table($name))->insertBatch($mapped);
             }
         }
@@ -183,10 +186,94 @@ namespace {
             profileAssert(rmdir($directory), 'Could not remove temporary count cache directory');
         }
     }
-    function profileEmulator($db, string $emulator, int $rows, int $iterations): array {
+    function itemComparisonBuilder($db, string $term) {
+        $escape = $db->likeEscapeChar;
+        $term = strtr($term, [$escape => $escape . $escape, '%' => $escape . '%', '_' => $escape . '_']);
+        return $db->table(table('item_template'))->like(column('item_template', 'name'), $term, 'both', true);
+    }
+    function itemComparisonPage($db, string $term, int $offset, bool $derived): array {
+        $fields = ['entry', 'name', 'ItemLevel', 'RequiredLevel', 'InventoryType', 'Quality', 'class', 'subclass'];
+        $entry = column('item_template', 'entry'); $level = column('item_template', 'ItemLevel');
+        $builder = itemComparisonBuilder($db, $term);
+        if (!$derived) return $builder->select(columns('item_template', $fields))
+            ->orderBy($level, 'DESC')->orderBy($entry, 'ASC')->limit(10, $offset)->get()->getResultArray();
+        $page = $builder->select(identifier($entry) . ' AS armory_entry, ' . identifier($level) . ' AS armory_level', false)
+            ->orderBy($level, 'DESC')->orderBy($entry, 'ASC')->limit(10, $offset);
+        $select = implode(', ', array_map(fn($field) => 'armory_item.' . identifier(column('item_template', $field)) . ' AS ' . identifier($field), $fields));
+        return $db->newQuery()->fromSubquery($page, 'armory_page')
+            ->join(table('item_template') . ' armory_item', 'armory_item.' . identifier($entry) . ' = armory_page.armory_entry', 'inner', false)
+            ->select($select, false)->orderBy('armory_page.armory_level', 'DESC')->orderBy('armory_page.armory_entry', 'ASC')->get()->getResultArray();
+    }
+    function verifyItemComparison(array $records, array $expected, int $offset): void {
+        $expected = array_slice($expected, $offset, 10);
+        profileAssert(array_map('intval', array_column($records, 'entry')) === $expected, 'Item candidate changed page membership or order');
+        foreach ($records as $index => $record) {
+            $id = $expected[$index];
+            $values = ['entry' => $id, 'name' => syntheticName($id), 'ItemLevel' => $id % 300 + 1,
+                'RequiredLevel' => 50, 'InventoryType' => 13, 'Quality' => 3, 'class' => 2, 'subclass' => 7];
+            profileAssert(array_keys($record) === array_keys($values), 'Item candidate changed selected fields');
+            foreach ($values as $field => $value) profileAssert(($field === 'name' ? $record[$field] : (int) $record[$field]) === $value, 'Item candidate changed field ' . $field);
+        }
+    }
+    function measureItemCandidates($db, array $operations, callable $verify, int $iterations): array {
+        $measurements = [];
+        \CodeIgniter\Events\Events::$capture = false;
+        foreach ($operations as $name => $operation) {
+            $start = hrtime(true); $result = $operation(); $warmMs = (hrtime(true) - $start) / 1e6;
+            $verify($result);
+            $measurements[$name] = ['warmup_ms' => round($warmMs, 3), 'samples' => [], 'sql' => []];
+        }
+        for ($sample = 0; $sample < $iterations; $sample++) {
+            $order = array_keys($operations);
+            if ($sample % 2) $order = array_reverse($order);
+            foreach ($order as $position => $name) {
+                $before = handlerReads($db);
+                \CodeIgniter\Events\Events::$queries = [];
+                \CodeIgniter\Events\Events::$capture = true;
+                $start = hrtime(true); $result = $operations[$name](); $elapsed = (hrtime(true) - $start) / 1e6;
+                $queries = \CodeIgniter\Events\Events::$queries;
+                \CodeIgniter\Events\Events::$capture = false;
+                $after = handlerReads($db);
+                $verify($result);
+                profileAssert(count($queries) === 1, 'Item candidate must execute one statement');
+                if (!$measurements[$name]['sql']) $measurements[$name]['sql'] = $queries;
+                profileAssert($measurements[$name]['sql'] === $queries, 'Item candidate SQL changed between samples');
+                $delta = []; foreach ($after as $counter => $value) $delta[$counter] = $value - ($before[$counter] ?? 0);
+                $measurements[$name]['samples'][] = ['elapsed_ms' => round($elapsed, 3), 'query_count' => count($queries),
+                    'execution_position' => $position + 1, 'handler_read_delta' => $delta];
+            }
+        }
+        foreach ($measurements as &$measured) {
+            $measured['timing'] = timeSummary(array_column($measured['samples'], 'elapsed_ms'));
+            $measured['query_count'] = count($measured['sql']);
+            $measured['queries'] = array_map(fn($sql) => ['sql' => $sql, 'explain_estimates' => $db->query('EXPLAIN ' . $sql)->getResultArray()], $measured['sql']);
+            unset($measured['sql']);
+        }
+        unset($measured);
+        return $measurements;
+    }
+    function profileItemCandidates($db, int $rows, int $iterations): array {
+        $workloads = [];
+        foreach (['selective' => 'Hero', 'common' => 'Player', 'interior' => 'entHero', 'no_match' => 'NeverMatched'] as $case => $term) {
+            $expected = expectedIds($rows, $term, 'items');
+            $offsets = ['first' => 0];
+            if ($expected) $offsets['deep'] = max(0, min(5000, intdiv(count($expected) - 1, 10) * 10));
+            foreach ($offsets as $page => $offset) {
+                $operations = ['original' => fn() => itemComparisonPage($db, $term, $offset, false),
+                    'derived_id_page' => fn() => itemComparisonPage($db, $term, $offset, true)];
+                $workloads[] = ['case' => $case, 'page' => $page, 'term' => $term, 'offset' => $offset,
+                    'matching_rows' => count($expected), 'returned_rows' => count(array_slice($expected, $offset, 10)),
+                    'candidates' => measureItemCandidates($db, $operations, fn($records) => verifyItemComparison($records, $expected, $offset), $iterations)];
+            }
+        }
+        return ['measurement' => 'Item page only, without count or HTTP. One excluded warm-up per candidate; measured candidates alternate execution order each sample. Each statement must return the same ordered IDs and all eight current item fields.',
+            'semantics' => 'Both candidates preserve escaped contains matching and ItemLevel DESC, entry ASC order. The derived candidate selects a bounded ID/level page, then joins its item details in the same statement.',
+            'workloads' => $workloads];
+    }
+    function profileEmulator($db, string $emulator, int $rows, int $iterations, int $itemPadding, bool $itemNameIndex): array {
         $GLOBALS['emulator'] = (new \ReflectionClass($emulator))->newInstanceWithoutConstructor();
         fwrite(STDERR, "Seeding $emulator: $rows rows per searchable table\n");
-        $setup = seedProfile($db, $rows); $model = profileModel($db); $workloads = [];
+        $setup = seedProfile($db, $rows, $itemPadding, $itemNameIndex); $model = profileModel($db); $workloads = [];
         foreach (['characters', 'items', 'guilds'] as $type) {
             foreach (['selective' => 'Hero', 'common' => 'Player', 'interior' => 'entHero', 'no_match' => 'NeverMatched'] as $case => $term) {
                 $expected = expectedIds($rows, $term, $type);
@@ -214,25 +301,27 @@ namespace {
         $comparison['semantics'] = 'Analytical comparison only. Prefix matching excludes interior matches and is not an equivalent replacement for the application query.';
         $comparison['interior_matches_lost_by_prefix'] = $comparison['contains']['matching_rows'] - $comparison['prefix_candidate']['matching_rows'];
         $cached = profileCachedCounts($db, $model, $rows, $iterations);
+        $itemCandidates = profileItemCandidates($db, $rows, $iterations);
         foreach (array_keys($setup) as $name) $db->query('DROP TABLE ' . identifier(table($name)));
-        return ['setup' => $setup, 'workloads' => $workloads, 'prefix_comparison' => $comparison, 'count_cache' => $cached];
+        return ['setup' => $setup, 'workloads' => $workloads, 'prefix_comparison' => $comparison, 'count_cache' => $cached, 'item_query_comparison' => $itemCandidates];
     }
 
     try {
-        $options = ['rows' => 10000, 'iterations' => 5, 'output' => null]; $seen = [];
+        $options = ['rows' => 10000, 'iterations' => 5, 'output' => null, 'item-padding' => 0, 'item-name-index' => 1]; $seen = [];
         foreach (array_slice($argv, 1) as $argument) {
             if ($argument === '--help') {
                 echo "Manual synthetic Armory profile on an owned loopback test database.\n",
-                    "Usage: php tests/armory_profile.php [--rows=10000] [--iterations=5] [--output=report.json]\n",
+                    "Usage: php tests/armory_profile.php [--rows=10000] [--iterations=5] [--item-padding=0] [--item-name-index=1] [--output=report.json]\n",
                     "Requires FUSION_TEST_MYSQL_HOST=127.0.0.1 or ::1; uses FUSION_TEST_MYSQL_PORT/PASSWORD.\n",
-                    "Rows: 1000..200000 per searchable table. Iterations: 3..15. No timing pass/fail threshold.\n";
+                    "Rows: 1000..200000 per searchable table. Iterations: 3..15. Item padding: 0..4096 bytes of unselected synthetic data per row.\n",
+                    "Item name index: 0 or 1. Other tables retain their name indexes. No timing pass/fail threshold.\n";
                 exit;
             }
-            profileAssert(preg_match('/^--(rows|iterations|output)=(.+)$/D', $argument, $match) === 1, 'Unknown or malformed argument');
+            profileAssert(preg_match('/^--(rows|iterations|output|item-padding|item-name-index)=(.+)$/D', $argument, $match) === 1, 'Unknown or malformed argument');
             profileAssert(!isset($seen[$match[1]]), 'Duplicate argument'); $seen[$match[1]] = true;
             $options[$match[1]] = $match[2];
         }
-        foreach (['rows' => [1000, 200000], 'iterations' => [3, 15]] as $key => [$min, $max]) {
+        foreach (['rows' => [1000, 200000], 'iterations' => [3, 15], 'item-padding' => [0, 4096], 'item-name-index' => [0, 1]] as $key => [$min, $max]) {
             profileAssert(preg_match('/^[0-9]+$/D', (string) $options[$key]) === 1 && $options[$key] >= $min && $options[$key] <= $max, 'Invalid ' . $key);
             $options[$key] = (int) $options[$key];
         }
@@ -257,13 +346,15 @@ namespace {
             $report = ['generated_at_utc' => gmdate('c'), 'server_version' => $admin->server_info, 'php_version' => PHP_VERSION,
                 'rows_per_searchable_table' => $options['rows'], 'iterations' => $options['iterations'], 'page_size' => 10,
                 'query_cache' => $cache, 'collation' => 'utf8mb4_unicode_ci', 'sql_mode' => 'STRICT_TRANS_TABLES,ONLY_FULL_GROUP_BY,NO_ENGINE_SUBSTITUTION',
+                'item_fixture' => ['unselected_padding_bytes_per_row' => $options['item-padding'], 'name_index' => (bool) $options['item-name-index'],
+                    'description' => 'Synthetic sensitivity scenarios only; padding and index choices do not reproduce a particular realm database.'],
                 'innodb_buffer_pool_size_bytes' => (int) $db->query("SHOW VARIABLES LIKE 'innodb_buffer_pool_size'")->getRowArray()['Value'],
                 'measurement' => 'Controller-equivalent bounded database path: count first, then the actual model page only when offset is below total. Excludes HTTP handling, result formatting and icons.',
                 'limits' => ['Synthetic deterministic data with minimal emulator-shaped tables and explicit indexes, not a production dump.',
                     'One excluded warm-up per workload; single-client warm-buffer samples include PHP model and database work.',
                     'EXPLAIN rows are optimizer estimates; Handler_read counters measure handler activity, not exact rows examined.',
                     'Results do not establish production capacity. No application search behavior or game schema is changed.'], 'emulators' => []];
-            foreach (['Trinity', 'Vmangos'] as $emulatorClass) $report['emulators'][$emulatorClass] = profileEmulator($db, $emulatorClass, $options['rows'], $options['iterations']);
+            foreach (['Trinity', 'Vmangos'] as $emulatorClass) $report['emulators'][$emulatorClass] = profileEmulator($db, $emulatorClass, $options['rows'], $options['iterations'], $options['item-padding'], (bool) $options['item-name-index']);
             $db->close();
         } finally {
             if ($owned) {
