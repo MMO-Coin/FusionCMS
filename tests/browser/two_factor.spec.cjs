@@ -3,6 +3,18 @@ const {test, expect, openPage, login, blockExternal, fixture, verify, snapshot} 
 const {requestLink, reset} = require('./recovery-helpers.cjs');
 
 const fixedKey = 'GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQ';
+async function dismissAlert(page, navigation) {
+    if (!navigation) {
+        // didClose follows delayed focus restoration; a hidden popup alone is too early.
+        await page.evaluate(() => {
+            window.totpAlertClosed = false;
+            Swal.once('didClose', () => { window.totpAlertClosed = true; });
+        });
+    }
+    await page.locator('.swal2-confirm').click();
+    if (navigation) await expect(page).toHaveURL(navigation);
+    else await page.waitForFunction(() => window.totpAlertClosed === true);
+}
 function code(secret, step = Math.floor(Date.now() / 30000)) {
     const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567';
     const bits = [...secret].map(value => alphabet.indexOf(value).toString(2).padStart(5, '0')).join('');
@@ -38,8 +50,7 @@ async function challenge(page, digit) {
     const response = await sent;
     const result = await response.json();
     await expect(page.locator('.swal2-popup')).toBeVisible();
-    await page.locator('.swal2-confirm').click();
-    if (result.status) await expect(page).toHaveURL(/\/ucp$/);
+    await dismissAlert(page, result.status ? /\/ucp$/ : null);
     return result;
 }
 async function save(page, enabled, password, digit) {
@@ -50,12 +61,13 @@ async function save(page, enabled, password, digit) {
     }
     await page.locator('#current_password').fill(password);
     await page.locator('#auth_code').fill(digit);
+    await expect(page.locator('#current_password')).toHaveValue(password);
+    await expect(page.locator('#auth_code')).toHaveValue(digit);
     const sent = page.waitForResponse(response => response.url().endsWith('/ucp/security/submit'));
     await page.locator('#security-settings input[type="submit"]').click();
     const result = await (await sent).json();
     await expect(page.locator('.swal2-popup')).toBeVisible();
-    await page.locator('.swal2-confirm').click();
-    if (result.status) await expect(page).toHaveURL(/\/login$/);
+    await dismissAlert(page, result.status ? /\/login$/ : null);
     return result;
 }
 function state() { return JSON.parse(fixture('totp-state')); }
@@ -68,6 +80,8 @@ test('enrollment requires a fresh password, server-owned unexpired setup and a v
         const activePage = await active.newPage(); await login(activePage, 'E2EPLAYER', 'BrowserTest123', true);
         const otherPage = await other.newPage(); await login(otherPage, 'E2EOTHER', 'BrowserTest123', true);
         await page.goto('/ucp/security');
+        // Keep rejected alerts closing long enough to exercise consecutive form fills.
+        await page.addStyleTag({content: '.swal2-popup.swal2-hide { animation-duration: 1s !important; }'});
         const key = await page.locator('#setup-key').textContent();
         expect((await page.request.get('/ucp/security/submit')).status()).toBe(405);
         expect((await page.request.post('/ucp/security/submit', {form: {security_enabled: 'true'}})).status()).toBe(403);
