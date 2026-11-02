@@ -26,3 +26,5 @@ Armory keeps one table per result type and requests ten rows at a time. The serv
 Search accepts 3 to 100 characters. `%` and `_` are treated as text. Case matching follows the realm database's existing collation, and counts use the same filter as the results. Character faction comes from the selected race without another query per row. Guild member counts cover only the guilds on the requested page, including guilds with no members or a missing leader.
 
 Search still matches text anywhere in the name. Ordinary name indexes do not remove the cost of a leading wildcard. This update does not add indexes or alter game databases. Item search remains available through expansion ID 4, matching the existing supported schemas.
+
+The [Armory profiling guide](testing/armory-performance.md) explains how to measure these queries on a disposable database and records the next optimization priorities.

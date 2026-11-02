@@ -94,6 +94,14 @@ jobs:
         FUSION_TEST_MYSQL_PASSWORD: fusion_test
       run: php tests/armory_search_test.php
 
+    - name: Check isolated Armory profiling on MySQL
+      env:
+        FUSION_TEST_MYSQL_HOST: 127.0.0.1
+        FUSION_TEST_MYSQL_PASSWORD: fusion_test
+      run: |
+        mkdir -p output/playwright
+        php tests/armory_profile.php --rows=1000 --iterations=3 --output=output/playwright/armory-profile.json
+
     - name: Run request throttling regression tests
       run: php tests/throttler_test.php
 
@@ -183,6 +191,7 @@ jobs:
       with:
         name: browser-php-${{ matrix.php }}
         path: |
+          output/playwright/armory-profile.json
           output/playwright/report/
           output/playwright/results/
           output/playwright/logs/

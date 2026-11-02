@@ -100,6 +100,8 @@ Admin asset browser checks visit basic log pages, account search, the dashboard,
 
 Armory browser checks use a realm inside the owned disposable auth schema, with 125 characters, items and guilds. They cover page boundaries, literal wildcard searches, empty guilds, malformed requests, escaped result names and retry after a failed request. `php tests/armory_search_test.php` exercises the real query builder with Trinity and VMaNGOS column maps on SQLite and the optional loopback MySQL server. MySQL runs with `ONLY_FULL_GROUP_BY`; query checks verify one character query per page and member aggregation restricted to the current guild page.
 
+CI also runs `tests/armory_profile.php` with 1,000 synthetic rows per searchable table and three measured samples on MySQL 8.0. It checks the profiling tool's results and cleanup on each PHP version, with no timing threshold. The `armory-profile.json` report is included in the seven-day browser artifacts. For larger local runs and measured optimization priorities, see the [Armory profiling guide](armory-performance.md).
+
 Open `output/playwright/report/index.html` for the HTML report. Failed tests retain screenshots, video and traces in `output/playwright/results`. PHP and RPC diagnostics are in `output/playwright/logs`. GitHub uploads those directories as a separate artifact for each PHP version, retained for seven days.
 
 ## Store, online players, dashboard and account settings

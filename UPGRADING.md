@@ -8,7 +8,12 @@ The public list update fixes news, inbox and sent pagination, bounds account sea
 
 Clear compiled templates after updating registration and recovery forms. If you maintain a custom registration template, merge the linked field errors, input attributes and text feedback from the bundled template. The bundled Heaven registration override is included. Custom language packs also need the new comment, registration and recovery feedback keys from the English files.
 
-For the log pagination changes on `main`, apply `application/modules/install/SQL/updates/2026_11_02_02_log_query_indexes.sql` to the **website database**. It adds indexes for account log ordering, website log ordering and article comments. The script can be rerun and reuses equivalent custom indexes. It does not change existing rows or the game databases. Fresh installations include these indexes. On large tables, schedule index creation during a maintenance window because it can take time and may block writes depending on the database version.
+On existing sites, apply these pagination updates from `main` to the **website database**:
+
+- `application/modules/install/SQL/updates/2026_11_02_02_log_query_indexes.sql` adds indexes for account log ordering, website log ordering and article comments.
+- `application/modules/install/SQL/updates/2026_11_02_03_list_query_indexes.sql` adds two store order indexes and two GM history indexes. See the [list performance guide](docs/list-performance.md) for details.
+
+Both scripts preserve existing rows, can be rerun and reuse equivalent custom indexes. Fresh installations already include these indexes. The scripts do not change game databases. On large tables, schedule index creation during a maintenance window because it can take time and may block writes depending on the database version.
 
 Email logs now show 25 records per page, newest ID first, with search handled by the server. Account and website log pages use timestamp and ID ordering, and requests cannot select more than 100 records at once. Clear compiled templates after deploying the login labels and keyboard password toggle.
 
