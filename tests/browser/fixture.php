@@ -55,6 +55,13 @@ function assertOwner(mysqli $db, string $database, string $nonce): void {
     $owner = $db->query("SELECT nonce FROM `$database`.`_fusion_e2e_owner`")->fetch_assoc();
     if (!$owner || !hash_equals($nonce, $owner['nonce'])) throw new RuntimeException('Fixture ownership check failed.');
 }
+function dashboardFixtureDate(string $value): DateTimeImmutable {
+    $date = DateTimeImmutable::createFromFormat('!Y-m-d', $value, new DateTimeZone('UTC'));
+    if (!preg_match('/^[0-9]{4}-[0-9]{2}-[0-9]{2}$/D', $value) || !$date || $date->format('Y-m-d') !== $value) {
+        throw new RuntimeException('Invalid dashboard fixture date.');
+    }
+    return $date;
+}
 function armoryCountCachePath(array $config): string {
     $ownedRoot = realpath($config['root']);
     $tempRoot = realpath(sys_get_temp_dir()); $ownedSite = realpath($config['root'] . '/site');
@@ -345,10 +352,12 @@ if ($action === 'cleanup') {
     file_put_contents($site . '/writable/cache/data/isOnline_1.cache',json_encode(['expiration'=>time()+300,'content'=>'no']));
 } elseif ($action === 'online-player-offline') {
     $db->select_db($config['auth']);$db->query('UPDATE characters SET online=0 WHERE guid=1');
+} elseif ($action === 'dashboard-calendar-day') {
+    echo gmdate('Y-m-d');
 } elseif ($action === 'seed-dashboard') {
+    $today=dashboardFixtureDate($argv[3] ?? gmdate('Y-m-d'));$month=$today->modify('first day of this month');$previous=$month->modify('-1 month');
     $db->select_db($config['cms']);
     foreach (['visitor_log','daily_signups','monthly_income','monthly_votes'] as $table) $db->query('DELETE FROM `' . $table . '`');
-    $today=new DateTimeImmutable('today');$month=$today->modify('first day of this month');$previous=$month->modify('-1 month');
     $visitor=$db->prepare('INSERT INTO visitor_log (`date`,ip,timestamp) VALUES (?,?,?)');
     foreach ([['127.0.0.1',$today],['192.0.2.10',$today],['192.0.2.20',$today],['198.51.100.1',$today->modify('+1 day')]] as [$ip,$date]) {
         $text=$date->format('Y-m-d');$timestamp=$date->getTimestamp();$visitor->bind_param('ssi',$text,$ip,$timestamp);$visitor->execute();
@@ -367,14 +376,15 @@ if ($action === 'cleanup') {
     }
     require_once $site . '/application/libraries/ConfigEditor.php';
     $editor=new ConfigEditor($site . '/application/config/fusion.php');$editor->set('cache',true);$editor->save();
-    echo json_encode(['signups'=>7+$extra,'visits'=>3+($extra?1:0),'unique'=>3]);
+    foreach (glob($site . '/writable/cache/data/dashboard_*.cache') as $file) if (is_file($file)) unlink($file);
+    echo json_encode(['date'=>$today->format('Y-m-d'),'signups'=>7+$extra,'visits'=>3+($extra?1:0),'unique'=>3]);
 } elseif ($action === 'change-dashboard-data') {
     $db->select_db($config['cms']);
-    $date=date('Y-m-d');$month=date('Y-m');
+    $seedDate=dashboardFixtureDate($argv[3] ?? '');$date=$seedDate->format('Y-m-d');$month=$seedDate->format('Y-m');
     $statement=$db->prepare('UPDATE daily_signups SET amount=amount+10 WHERE `date`=?');$statement->bind_param('s',$date);$statement->execute();
     $statement=$db->prepare('UPDATE monthly_income SET amount=amount+5 WHERE month=?');$statement->bind_param('s',$month);$statement->execute();
 } elseif ($action === 'expire-dashboard-cache' || $action === 'expire-current-dashboard-graph') {
-    $pattern = $action === 'expire-current-dashboard-graph' ? 'dashboard_graph_v2_monthly_' . date('Y') . '_01.cache' : 'dashboard_*.cache';
+    $pattern = $action === 'expire-current-dashboard-graph' ? 'dashboard_graph_v2_monthly_' . dashboardFixtureDate($argv[3] ?? '')->format('Y') . '_01.cache' : 'dashboard_*.cache';
     foreach (glob($site . '/writable/cache/data/' . $pattern) as $file) {
         $value=json_decode(file_get_contents($file),true);$value['expiration']=time()-1;file_put_contents($file,json_encode($value));
     }
